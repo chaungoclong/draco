@@ -15,7 +15,9 @@ Draco sử dụng bộ phím tắt chuẩn hiện đại (VS Code / Sublime). Tr
 ## Điều hướng & Giao diện
 | Phím tắt | Chức năng |
 |---|---|
-| `Ctrl+P` | Mở Quick Open (tìm file fuzzy) |
+| `Ctrl+P` | Mở Quick Open (tab `Files` — chuyển tab `Files \| Recent \| Symbols` bằng `Tab`) |
+| `Ctrl+E` | Mở Recent Files (danh sách file vừa làm việc theo thứ tự MRU) |
+| `Ctrl+R` | Mở Go to Symbol (nhảy nhanh tới hàm, struct, class, heading trong file hiện tại) |
 | `Ctrl+Shift+P` | Mở Command Palette (chạy lệnh & plugin) |
 | `Ctrl+,` | Mở Settings & Plugin Manager |
 | `Ctrl+B` | Ẩn/hiện File Explorer |
@@ -34,6 +36,7 @@ Draco sử dụng bộ phím tắt chuẩn hiện đại (VS Code / Sublime). Tr
 | `Tab` / `Shift+Tab` | Thụt lề / Giảm thụt lề |
 | `Alt+Up` / `Alt+Down` | Di chuyển dòng lên / xuống |
 | `Shift+Alt+Down` | Nhân bản dòng |
+| `Shift+Alt+Right` / `Shift+Alt+Left` | Mở rộng / Thu gọn vùng chọn theo cú pháp AST (Tree-sitter) |
 | `Ctrl+D` | Chọn từ hiện tại / thêm lần xuất hiện tiếp theo |
 | `Ctrl+Alt+Up` / `Ctrl+Alt+Down` | Thêm con trỏ lên / xuống |
 | `Alt+Click` | Đặt thêm con trỏ tại vị trí chuột |

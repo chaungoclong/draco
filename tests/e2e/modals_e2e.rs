@@ -156,3 +156,55 @@ fn command_palette_settings_modal_and_find_bar_escape_e2e() {
     });
     assert!(closed && !find.open);
 }
+
+#[test]
+fn unified_quick_open_recent_and_symbols_tabs_e2e() {
+    use draco::syntax::symbols::{DocumentSymbol, SymbolKind};
+    use draco::ui::quick_open::{QuickOpenAction, QuickOpenTab};
+
+    let ctx = egui::Context::default();
+    let theme = Theme::dark();
+    let indexer = WorkspaceIndexer::default();
+    let recent = vec![PathBuf::from("/tmp/recent_a.rs"), PathBuf::from("/tmp/recent_b.rs")];
+    let symbols = vec![
+        DocumentSymbol {
+            name: "alpha_fn".into(),
+            kind: SymbolKind::Function,
+            start_line: 3,
+            end_line: 10,
+            depth: 0,
+        },
+        DocumentSymbol {
+            name: "beta_struct".into(),
+            kind: SymbolKind::Struct,
+            start_line: 14,
+            end_line: 20,
+            depth: 0,
+        },
+    ];
+
+    let mut qo = QuickOpenState::default();
+    qo.show_tab(QuickOpenTab::Recent);
+
+    // Tab switches from Recent -> Symbols
+    let _ = ctx.run(raw_input(vec![key_press(Key::Tab, Modifiers::NONE)]), |ctx| {
+        quick_open::show_quick_open_unified(ctx, &mut qo, &indexer, None, &recent, &symbols, &theme);
+    });
+    assert_eq!(qo.tab, QuickOpenTab::Symbols);
+
+    // ArrowDown + Enter selects `beta_struct` at line 14
+    let mut act = None;
+    let _ = ctx.run(
+        raw_input(vec![
+            key_press(Key::ArrowDown, Modifiers::NONE),
+            key_press(Key::Enter, Modifiers::NONE),
+        ]),
+        |ctx| {
+            act = quick_open::show_quick_open_unified(
+                ctx, &mut qo, &indexer, None, &recent, &symbols, &theme,
+            );
+        },
+    );
+    assert_eq!(act, Some(QuickOpenAction::JumpToLine(14)));
+    assert!(!qo.open);
+}

@@ -1,5 +1,7 @@
 mod common;
 
+#[path = "unit/ast_symbols_tests.rs"]
+mod ast_symbols_tests;
 #[path = "unit/buffer_tests.rs"]
 mod buffer_tests;
 #[path = "unit/config_syntax_tests.rs"]

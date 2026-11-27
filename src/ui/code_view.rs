@@ -10,6 +10,8 @@ use crate::core::buffer::Document;
 use crate::core::editing::{self, MoveDir};
 use crate::core::selection::Selection;
 use crate::lsp::client::DiagnosticItem;
+use crate::syntax::ast::AstSelectionHistory;
+use crate::syntax::symbols;
 use crate::syntax::{HighlightSpan, SyntaxState};
 use crate::theme::Theme;
 
@@ -35,6 +37,8 @@ pub struct CodeViewState {
     pub scroll_to_line: Option<usize>,
     pub scroll_to_top_line: Option<f32>,
     dragging: bool,
+    pub ast_selection: AstSelectionHistory,
+    last_top_visible_line: usize,
 }
 
 impl Default for CodeViewState {
@@ -45,6 +49,8 @@ impl Default for CodeViewState {
             scroll_to_line: None,
             scroll_to_top_line: None,
             dragging: false,
+            ast_selection: AstSelectionHistory::default(),
+            last_top_visible_line: 0,
         }
     }
 }
@@ -105,13 +111,80 @@ pub fn show_code_view(
     let before_version = doc.version;
     if has_focus {
         let page_lines = ((ui.available_height() / line_height) as usize).saturating_sub(2).max(5);
-        handle_keyboard(ui, doc, page_lines, clipboard, &mut output);
+        handle_keyboard(
+            ui,
+            doc,
+            syntax,
+            &mut state.ast_selection,
+            page_lines,
+            clipboard,
+            &mut output,
+        );
     }
     if doc.version != before_version {
         output.text_changed = true;
         state.ensure_cursor_visible = true;
+        state.ast_selection.clear();
         let new_deltas = doc.drain_deltas();
         syntax.sync(&doc.rope, doc.language, doc.version, &new_deltas);
+    }
+
+    // Sticky Scroll header: O(tree depth) query for up to 3 enclosing AST scopes
+    let sticky_scopes = syntax
+        .tree()
+        .map(|tree| {
+            symbols::enclosing_scopes_at_line(
+                tree,
+                &doc.rope,
+                doc.language,
+                state.last_top_visible_line,
+                3,
+            )
+        })
+        .unwrap_or_default();
+    if !sticky_scopes.is_empty() && ui.available_height() > 140.0 {
+        let mut jump_line: Option<usize> = None;
+        egui::Frame::NONE
+            .fill(theme.bg_panel)
+            .stroke(Stroke::new(1.0_f32, theme.border))
+            .inner_margin(egui::Margin::symmetric(0, 2))
+            .show(ui, |ui| {
+                ui.set_min_width(ui.available_width());
+                for scope in &sticky_scopes {
+                    let row_h = (line_height * 0.92).max(17.0);
+                    let (row_rect, row_resp) = ui.allocate_exact_size(
+                        Vec2::new(ui.available_width(), row_h),
+                        Sense::click(),
+                    );
+                    if row_resp.hovered() {
+                        ui.painter().rect_filled(row_rect, 0.0, theme.bg_hover);
+                        ui.ctx().set_cursor_icon(CursorIcon::PointingHand);
+                    }
+                    let line_no = format!("{}", scope.start_line + 1);
+                    ui.painter().text(
+                        Pos2::new(row_rect.min.x + gutter_width - char_width * 0.9, row_rect.center().y),
+                        Align2::RIGHT_CENTER,
+                        line_no,
+                        font_id.clone(),
+                        theme.fg_gutter,
+                    );
+                    let snippet = doc.line_string_without_newline(scope.start_line);
+                    let indent_px = (scope.depth as f32 * 10.0).min(30.0);
+                    ui.painter().text(
+                        Pos2::new(row_rect.min.x + gutter_width + text_left_pad + indent_px, row_rect.center().y),
+                        Align2::LEFT_CENTER,
+                        snippet.trim(),
+                        font_id.clone(),
+                        theme.fg_text,
+                    );
+                    if row_resp.clicked() {
+                        jump_line = Some(scope.start_line);
+                    }
+                }
+            });
+        if let Some(target) = jump_line {
+            state.scroll_to_top_line = Some(target as f32);
+        }
     }
 
     // Compute virtual canvas size
@@ -167,6 +240,7 @@ pub fn show_code_view(
 
             // Visible line range + exact fractional top line for smooth Markdown scroll sync
             output.top_visible_line = (viewport.min.y / line_height).max(0.0);
+            state.last_top_visible_line = output.top_visible_line.floor().max(0.0) as usize;
             let first_line = ((viewport.min.y / line_height).floor().max(0.0) as usize)
                 .saturating_sub(1);
             let last_line = (((viewport.max.y / line_height).ceil().max(0.0) as usize) + 2)
@@ -699,6 +773,8 @@ fn handle_mouse(
 fn handle_keyboard(
     ui: &egui::Ui,
     doc: &mut Document,
+    syntax: &SyntaxState,
+    ast_selection: &mut AstSelectionHistory,
     page_lines: usize,
     clipboard: &mut Option<arboard::Clipboard>,
     output: &mut CodeViewOutput,
@@ -741,7 +817,7 @@ fn handle_keyboard(
                 modifiers,
                 ..
             } => {
-                handle_key_press(key, modifiers, doc, page_lines, clipboard);
+                handle_key_press(key, modifiers, doc, syntax, ast_selection, page_lines, clipboard);
             }
             _ => {}
         }
@@ -752,6 +828,8 @@ fn handle_key_press(
     key: Key,
     m: Modifiers,
     doc: &mut Document,
+    syntax: &SyntaxState,
+    ast_selection: &mut AstSelectionHistory,
     page_lines: usize,
     clipboard: &mut Option<arboard::Clipboard>,
 ) {
@@ -825,9 +903,25 @@ fn handle_key_press(
         }
     }
 
-    // Alt+Up/Down -> move line; Shift+Alt+Down -> duplicate line
+    // Alt+Up/Down -> move line; Shift+Alt+Down -> duplicate line; Shift+Alt+Right/Left -> AST Expand/Shrink Selection
     if m.alt && !m.command {
         match key {
+            Key::ArrowRight if m.shift => {
+                if let Some(tree) = syntax.tree() {
+                    let cur = doc.selections.primary();
+                    if let Some(expanded) = ast_selection.expand(tree, &doc.rope, cur) {
+                        doc.selections.set_single(expanded, doc.len_chars());
+                    }
+                }
+                return;
+            }
+            Key::ArrowLeft if m.shift => {
+                let cur = doc.selections.primary();
+                if let Some(shrunk) = ast_selection.shrink(cur) {
+                    doc.selections.set_single(shrunk, doc.len_chars());
+                }
+                return;
+            }
             Key::ArrowDown if m.shift => {
                 editing::duplicate_lines(doc);
                 return;

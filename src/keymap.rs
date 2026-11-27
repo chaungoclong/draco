@@ -15,6 +15,8 @@ pub enum AppAction {
     NewTerminalTab,
     ToggleTheme,
     OpenQuickOpen,
+    OpenRecentFiles,
+    OpenSymbolPicker,
     OpenCommandPalette,
     OpenSettings,
     OpenFind,
@@ -53,6 +55,12 @@ pub fn poll_global_action(ctx: &egui::Context) -> Option<AppAction> {
         }
         if i.consume_key(Modifiers::COMMAND, Key::P) {
             return Some(AppAction::OpenQuickOpen);
+        }
+        if i.consume_key(Modifiers::COMMAND, Key::E) {
+            return Some(AppAction::OpenRecentFiles);
+        }
+        if i.consume_key(Modifiers::COMMAND, Key::R) {
+            return Some(AppAction::OpenSymbolPicker);
         }
         if i.consume_key(Modifiers::COMMAND, Key::Comma) {
             return Some(AppAction::OpenSettings);

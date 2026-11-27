@@ -10,7 +10,7 @@ Tất cả thay đổi đáng chú ý của **Draco** đều được ghi nhận
   - **Code Outline / Go to Symbol (`Ctrl+R`, `src/syntax/symbols.rs`)**: trích xuất symbol từ Tree-sitter cho Rust, Python, JS/TS, PHP, C/C++, TOML, JSON, Markdown và nhảy thẳng tới dòng định nghĩa qua fuzzy search.
   - **Sticky Scroll trong `CodeView`**: tự động ghim tối đa 3 dòng ngữ cảnh bao quanh (`impl`, `fn`, `class`, `struct`…) ở mép trên khi cuộn sâu; bấm vào dòng ghim để nhảy về đầu khối.
   - **Recent Files (`Ctrl+E`) & Unified Quick Open (`Files | Recent | Symbols`)**: theo dõi lịch sử file mở gần nhất (MRU) và gộp 3 tab điều hướng chuyển nhanh bằng phím `Tab`.
-- **GitHub Actions CI (`.github/workflows/ci.yml`)**: tự động chạy `cargo check --all-targets`, `cargo test`, và `cargo build --release` trên Ubuntu cho mọi push và PR vào `main`.
+- **GitHub Actions CI (`.github/workflows/ci.yml`)**: tự động chạy `cargo test` (unit, feature & headless E2E) gọn nhẹ trên Ubuntu với Cargo cache, `concurrency` tự hủy run cũ và `paths-ignore` cho thay đổi tài liệu thuần.
 - **Native OS File Watcher & Auto-Reload (`notify`, `src/workspace/watcher.rs`)**:
   - Tự động reload các file đang mở (khi chưa có chỉnh sửa cục bộ) nếu bị thay đổi từ bên ngoài (vd: `git checkout`, formatter, script) và tự làm mới File Explorer / Quick Open khi thêm/xóa file.
 

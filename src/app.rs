@@ -26,7 +26,7 @@ use crate::ui::find_bar::{self, FindAction, FindBarState};
 use crate::ui::fonts;
 use crate::ui::icons::{self, ActivityIcon};
 use crate::ui::markdown_preview::{self, MarkdownPreviewCache, MarkdownViewMode, PreviewAction};
-use crate::ui::quick_open::{self, QuickOpenState};
+use crate::ui::quick_open::{self, QuickOpenAction, QuickOpenState, QuickOpenTab};
 use crate::ui::settings_modal::{self, SettingsModalAction, SettingsModalState};
 use crate::ui::status_bar::{self, StatusAction, StatusInfo};
 use crate::ui::tabs::{self, TabAction, TabInfo};
@@ -77,6 +77,7 @@ pub struct DracoApp {
     terminal_focused: bool,
     theme: Theme,
     quick_open: QuickOpenState,
+    recent_files: Vec<PathBuf>,
     find_bar: FindBarState,
     completion: CompletionState,
     md_mode: MarkdownViewMode,
@@ -127,6 +128,7 @@ impl DracoApp {
             terminal_focused: false,
             theme,
             quick_open: QuickOpenState::default(),
+            recent_files: Vec::new(),
             find_bar: FindBarState::default(),
             completion: CompletionState::default(),
             md_mode: MarkdownViewMode::Split,
@@ -244,8 +246,17 @@ impl DracoApp {
         }
     }
 
+    fn record_recent_file(&mut self, path: &Path) {
+        self.recent_files.retain(|p| p != path);
+        self.recent_files.insert(0, path.to_path_buf());
+        if self.recent_files.len() > 30 {
+            self.recent_files.truncate(30);
+        }
+    }
+
     fn open_file_path(&mut self, path: PathBuf) {
         let canonical = fs::canonicalize(&path).unwrap_or(path);
+        self.record_recent_file(&canonical);
         if let Some(existing) = self
             .tabs
             .iter()
@@ -712,7 +723,17 @@ impl DracoApp {
             }
             AppAction::OpenQuickOpen => {
                 self.command_palette.open = false;
-                self.quick_open.show_modal();
+                self.quick_open.show_tab(QuickOpenTab::Files);
+                self.terminal_focused = false;
+            }
+            AppAction::OpenRecentFiles => {
+                self.command_palette.open = false;
+                self.quick_open.show_tab(QuickOpenTab::Recent);
+                self.terminal_focused = false;
+            }
+            AppAction::OpenSymbolPicker => {
+                self.command_palette.open = false;
+                self.quick_open.show_tab(QuickOpenTab::Symbols);
                 self.terminal_focused = false;
             }
             AppAction::OpenCommandPalette => {
@@ -1513,16 +1534,41 @@ impl eframe::App for DracoApp {
             }
         }
 
-        // 9. Quick Open Modal (Ctrl+P)
+        // 9. Unified Quick Open Modal (Ctrl+P Files | Ctrl+E Recent | Ctrl+R Symbols)
         let root_path: Option<&Path> = self.file_tree.as_ref().map(|t| t.root.as_path());
-        if let Some(chosen) = quick_open::show_quick_open(
+        let active_symbols =
+            if self.quick_open.open && self.quick_open.tab == QuickOpenTab::Symbols {
+                self.tabs
+                    .get_mut(self.active_tab)
+                    .map(|tab| {
+                        let deltas = tab.doc.drain_deltas();
+                        tab.syntax
+                            .sync(&tab.doc.rope, tab.doc.language, tab.doc.version, &deltas);
+                        tab.syntax.extract_symbols(&tab.doc.rope)
+                    })
+                    .unwrap_or_default()
+            } else {
+                Vec::new()
+            };
+        if let Some(action) = quick_open::show_quick_open_unified(
             ctx,
             &mut self.quick_open,
             &self.indexer,
             root_path,
+            &self.recent_files,
+            &active_symbols,
             &self.theme,
         ) {
-            self.open_file_path(chosen);
+            match action {
+                QuickOpenAction::OpenFile(chosen) => self.open_file_path(chosen),
+                QuickOpenAction::JumpToLine(line) => {
+                    if let Some(tab) = self.tabs.get_mut(self.active_tab) {
+                        tab.doc.set_cursor_at_line_col(line, 0);
+                        tab.view.scroll_to_line = Some(line);
+                        self.terminal_focused = false;
+                    }
+                }
+            }
         }
 
         // 10. Command Palette (Ctrl+Shift+P)

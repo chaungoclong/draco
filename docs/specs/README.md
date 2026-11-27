@@ -18,4 +18,4 @@ Thư mục này lưu trữ các tài liệu đặc tả kỹ thuật cho từng 
 | 002 | Multi-Tab Terminal, Settings, Auto-Save, Plugins & PHP | Implemented | [002-multi-terminal-settings-plugins-php.md](./002-multi-terminal-settings-plugins-php.md) |
 | 003 | Config Highlighting & High-Performance Markdown Preview | Implemented | [003-config-highlighting-markdown-preview.md](./003-config-highlighting-markdown-preview.md) |
 | 004 | Native Ecosystem Library Upgrades (`nucleo-matcher`, `fontdb`, `directories`, `notify`) | Implemented | [004-native-ecosystem-upgrades.md](./004-native-ecosystem-upgrades.md) |
-/home/long/Videos/simplescreenrecorder-2026-11-28_06.14.09.mp4/home/long/Videos/simplescreenrecorder-2026-11-28_06.14.09.mp4
+| 005 | VS Code + JetBrains IDE Roadmap & Phase 1 (AST Selection, Symbols, Sticky Scroll, Recent Files) | Implemented | [005-vscode-jetbrains-ide-roadmap.md](./005-vscode-jetbrains-ide-roadmap.md) |

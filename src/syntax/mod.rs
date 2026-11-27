@@ -1,5 +1,7 @@
+pub mod ast;
 pub mod config_lexer;
 pub mod languages;
+pub mod symbols;
 
 use std::ops::Range;
 
@@ -197,6 +199,17 @@ impl SyntaxState {
             }
         }
         spans
+    }
+
+    pub fn tree(&self) -> Option<&Tree> {
+        self.tree.as_ref()
+    }
+
+    pub fn extract_symbols(&self, rope: &Rope) -> Vec<symbols::DocumentSymbol> {
+        match &self.tree {
+            Some(tree) => symbols::extract_symbols(tree, rope, self.language),
+            None => Vec::new(),
+        }
     }
 }
 

@@ -6,7 +6,7 @@ Tất cả thay đổi đáng chú ý của **Draco** đều được ghi nhận
 
 ### Added
 - **Cross-Platform Release Pipeline & End-User Installers ([Spec 008](./specs/008-release-pipeline-and-distribution.md))**:
-  - Thêm `.github/workflows/release.yml` tự động build & xuất bản GitHub Release khi đẩy tag `v*` cho **Linux x86_64** (`.tar.gz` + `.deb`), **macOS Apple Silicon & Intel** (`.tar.gz`) và **Windows x86_64** (`.zip`) kèm `SHA256SUMS.txt`.
+  - Thêm `.github/workflows/release.yml` tự động build & xuất bản GitHub Release khi đẩy tag `v*` cho **Linux x86_64** (`.tar.gz` + `.deb`), **macOS Apple Silicon & Intel** (`.tar.gz`) và **Windows x86_64** (`.exe` chạy trực tiếp + `.zip`) kèm `SHA256SUMS.txt`.
   - Thêm script cài đặt 1 dòng lệnh `scripts/install.sh` (Linux/macOS), `scripts/install.ps1` (Windows PowerShell) và `packaging/linux/draco.desktop` để người dùng cuối cài ngay không cần Rust toolchain.
 - **Hướng dẫn sử dụng cho người dùng cuối (`docs/guides/user-guide.md`)**: tài liệu tutorial chi tiết từng bước cho toàn bộ tính năng Draco (từ cơ bản đến Phase 1–3, Markdown/Mermaid, Terminal, Git Gutter, LSP, Settings & Plugins) kèm quy tắc tự đồng bộ trong `AGENTS.md`.
 - **Phase 3 IDE Ergonomics — LSP Quick-Fix, Rename, Inlay Hints, Signature Help & Git Gutter ([Spec 007](./specs/007-lsp-ide-actions-and-git-gutter.md))**:

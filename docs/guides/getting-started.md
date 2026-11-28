@@ -16,7 +16,9 @@ Tải file `draco_*_amd64.deb` từ trang [Releases](https://github.com/chaungoc
 sudo apt install ./draco_*_amd64.deb
 ```
 
-### Windows (PowerShell)
+### Windows (`.exe` chạy trực tiếp hoặc PowerShell)
+- **Chạy ngay không cần cài**: tải file `draco-*-x86_64-windows.exe` từ [GitHub Releases](https://github.com/chaungoclong/draco/releases) và click đúp để mở.
+- **Hoặc cài vào `PATH` bằng PowerShell**:
 ```powershell
 irm https://raw.githubusercontent.com/chaungoclong/draco/main/scripts/install.ps1 | iex
 ```

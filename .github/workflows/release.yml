@@ -125,12 +125,13 @@ jobs:
           dpkg-deb --build "${PKG_DIR}" "dist/draco_${VER}_amd64.deb"
           rm -rf "${PKG_DIR}"
 
-      - name: Package zip (Windows)
+      - name: Package Windows standalone .exe & .zip
         if: matrix.archive == 'zip'
         shell: pwsh
         run: |
           $stage = "draco-${{ steps.meta.outputs.tag }}-${{ matrix.asset_target }}"
           New-Item -ItemType Directory -Force -Path "dist\$stage" | Out-Null
+          Copy-Item "target\${{ matrix.target }}\release\draco.exe" "dist\$stage.exe"
           Copy-Item "target\${{ matrix.target }}\release\draco.exe" "dist\$stage\draco.exe"
           Copy-Item "docs\guides\user-guide.md" "dist\$stage\USER_GUIDE.md"
           Compress-Archive -Path "dist\$stage\*" -DestinationPath "dist\$stage.zip" -Force
@@ -188,7 +189,8 @@ jobs:
             sudo apt install ./draco_*_amd64.deb
             ```
 
-            ### Windows (PowerShell)
+            ### Windows (`.exe` or PowerShell)
+            Download `draco-*-x86_64-windows.exe` to run directly, or install into `PATH` via PowerShell:
             ```powershell
             irm https://raw.githubusercontent.com/chaungoclong/draco/main/scripts/install.ps1 | iex
             ```

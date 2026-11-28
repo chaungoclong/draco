@@ -20,7 +20,7 @@ Người dùng cuối không nên phải cài Rust toolchain, C compiler hay t�
   | `x86_64-unknown-linux-gnu` | `ubuntu-22.04` (glibc 2.35 tương thích rộng) | `draco-<tag>-x86_64-linux.tar.gz` + `draco_<ver>_amd64.deb` |
   | `aarch64-apple-darwin` | `macos-14` | `draco-<tag>-aarch64-macos.tar.gz` |
   | `x86_64-apple-darwin` | `macos-13` | `draco-<tag>-x86_64-macos.tar.gz` |
-  | `x86_64-pc-windows-msvc` | `windows-latest` | `draco-<tag>-x86_64-windows.zip` |
+  | `x86_64-pc-windows-msvc` | `windows-latest` | `draco-<tag>-x86_64-windows.exe` + `draco-<tag>-x86_64-windows.zip` |
 - **Publish Job**:
   - Tải toàn bộ artifact từ matrix, tạo `SHA256SUMS.txt`.
   - Tạo GitHub Release bằng `softprops/action-gh-release@v2` kèm release notes tự động và hướng dẫn cài nhanh.

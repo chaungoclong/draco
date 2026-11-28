@@ -394,8 +394,8 @@ fn render_node(
         }
     });
 
-    if node.is_dir && node.expanded {
-        if let Some(children) = node.children.as_mut() {
+    if node.is_dir && node.expanded
+        && let Some(children) = node.children.as_mut() {
             for child in children {
                 render_node(
                     ui,
@@ -411,5 +411,4 @@ fn render_node(
                 );
             }
         }
-    }
 }

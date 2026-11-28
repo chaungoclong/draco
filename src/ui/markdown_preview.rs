@@ -852,8 +852,8 @@ pub fn show_markdown_preview(
     }
 
     // Resolve anchor jump directly from cached heading_y_positions for instant, lag-free scrolling
-    if let Some(target) = cache.scroll_to_anchor.as_deref() {
-        if let Some((_, y)) = cache.heading_y_positions.iter().find(|(slug, _)| {
+    if let Some(target) = cache.scroll_to_anchor.as_deref()
+        && let Some((_, y)) = cache.heading_y_positions.iter().find(|(slug, _)| {
             cache
                 .headings
                 .iter()
@@ -864,7 +864,6 @@ pub fn show_markdown_preview(
             cache.pending_scroll_y = Some((*y - 8.0).max(0.0));
             cache.scroll_to_anchor = None;
         }
-    }
 
     // Apply scroll target cleanly without fighting user wheel scroll
     let preview_is_hovered = ui.rect_contains_pointer(pane_rect);
@@ -950,14 +949,12 @@ pub fn show_markdown_preview(
                     && preview_is_hovered
                     && (actual_y - prev_scroll_y).abs() > 1.5
                     && scroll_target.is_none()
-                {
-                    if let Some(target_line) =
+                    && let Some(target_line) =
                         compute_editor_line_from_preview_y(actual_y, &cache.block_positions)
                     {
                         cache.last_editor_top_line = target_line;
                         action = Some(PreviewAction::ScrollEditorToLine(target_line));
                     }
-                }
             }
         });
 
@@ -1080,8 +1077,8 @@ pub fn show_markdown_preview(
                                                 {
                                                     cache.pending_scroll_y =
                                                         Some((*hy - 8.0).max(0.0));
-                                                    if cache.scroll_sync {
-                                                        if let Some(target_line) =
+                                                    if cache.scroll_sync
+                                                        && let Some(target_line) =
                                                             compute_editor_line_from_preview_y(
                                                                 *hy,
                                                                 &cache.block_positions,
@@ -1094,7 +1091,6 @@ pub fn show_markdown_preview(
                                                                 ),
                                                             );
                                                         }
-                                                    }
                                                 } else {
                                                     scroll_target = Some(h.slug.clone());
                                                 }
@@ -1226,12 +1222,11 @@ fn render_block(
                 render_inline_spans(ui, spans, size, true, theme, clicked_url)
             };
 
-            if let Some(target) = scroll_target {
-                if !*scrolled && anchor_matches(target, slug, ascii_slug) {
+            if let Some(target) = scroll_target
+                && !*scrolled && anchor_matches(target, slug, ascii_slug) {
                     resp.scroll_to_me(Some(egui::Align::TOP));
                     *scrolled = true;
                 }
-            }
             if *level <= 2 {
                 let r = ui.allocate_exact_size(Vec2::new(content_w, 2.0), egui::Sense::hover()).0;
                 let line_col = if *level == 1 {

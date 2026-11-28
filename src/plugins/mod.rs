@@ -225,11 +225,10 @@ impl PluginManager {
             .spawn()
             .map_err(|e| format!("Failed to spawn '{}': {e}", cmd_spec.executable))?;
 
-        if cmd_spec.input_mode != PluginInputMode::None {
-            if let Some(mut stdin) = child.stdin.take() {
+        if cmd_spec.input_mode != PluginInputMode::None
+            && let Some(mut stdin) = child.stdin.take() {
                 let _ = stdin.write_all(ctx.stdin_text.as_bytes());
             }
-        }
 
         let output = child
             .wait_with_output()

@@ -62,7 +62,7 @@ pub fn show_command_palette(
             fuzzy_score(&state.query, &label).map(|s| (e, s))
         })
         .collect();
-    filtered.sort_by(|a, b| b.1.cmp(&a.1));
+    filtered.sort_by_key(|a| std::cmp::Reverse(a.1));
 
     if !filtered.is_empty() {
         state.selected = state.selected.min(filtered.len() - 1);
@@ -84,12 +84,11 @@ pub fn show_command_palette(
             state.selected - 1
         };
     }
-    if ctx.input(|i| i.key_pressed(Key::Enter)) {
-        if let Some((entry, _)) = filtered.get(state.selected) {
+    if ctx.input(|i| i.key_pressed(Key::Enter))
+        && let Some((entry, _)) = filtered.get(state.selected) {
             state.open = false;
             return Some(entry.command.clone());
         }
-    }
 
     let mut chosen = None;
     let mut close_clicked = false;

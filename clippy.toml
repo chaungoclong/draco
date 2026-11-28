@@ -1,0 +1,4 @@
+# Pragmatic Clippy thresholds for a native egui desktop editor
+too-many-arguments-threshold = 10
+type-complexity-threshold = 350
+cognitive-complexity-threshold = 40

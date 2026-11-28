@@ -58,7 +58,7 @@ fn mermaid_renders_visible_text_pixels_with_system_sans_font() {
     // Also verify significant dark text pixels exist in Light theme
     let dark_pixels = with_text
         .rgba_premultiplied
-        .chunks_exact(4)
+        .as_chunks::<4>().0.iter()
         .filter(|px| px[3] > 200 && px[0] < 90 && px[1] < 90 && px[2] < 90)
         .count();
     assert!(

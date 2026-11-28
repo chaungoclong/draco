@@ -5,18 +5,15 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum TerminalLayout {
+    #[default]
     Bottom,
     Right,
     Floating,
     Maximized,
 }
 
-impl Default for TerminalLayout {
-    fn default() -> Self {
-        Self::Bottom
-    }
-}
 
 impl TerminalLayout {
     pub fn label(self) -> &'static str {
@@ -93,7 +90,7 @@ impl Settings {
             fs::create_dir_all(parent)?;
         }
         let json = serde_json::to_string_pretty(self)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+            .map_err(std::io::Error::other)?;
         fs::write(path, json)
     }
 

@@ -71,11 +71,11 @@ pub fn extract_symbols(tree: &Tree, rope: &Rope, language: LanguageId) -> Vec<Do
 }
 
 /// Returns up to `max_scopes` nested enclosing scopes active at `top_line` for Sticky Scroll.
-pub fn enclosing_scopes<'a>(
-    symbols: &'a [DocumentSymbol],
+pub fn enclosing_scopes(
+    symbols: &[DocumentSymbol],
     top_line: usize,
     max_scopes: usize,
-) -> Vec<&'a DocumentSymbol> {
+) -> Vec<&DocumentSymbol> {
     if max_scopes == 0 {
         return Vec::new();
     }
@@ -120,9 +120,8 @@ pub fn enclosing_scopes_at_line(
         if start_line < top_line
             && top_line <= end_line
             && end_line.saturating_sub(start_line) >= 3
-        {
-            if let Some((kind, name)) = classify_node(node, rope, language, 0) {
-                if kind.is_sticky_scope() {
+            && let Some((kind, name)) = classify_node(node, rope, language, 0)
+                && kind.is_sticky_scope() {
                     chain.push(DocumentSymbol {
                         name,
                         kind,
@@ -131,8 +130,6 @@ pub fn enclosing_scopes_at_line(
                         depth: 0,
                     });
                 }
-            }
-        }
         match node.parent() {
             Some(p) => node = p,
             None => break,

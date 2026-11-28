@@ -80,9 +80,9 @@ pub fn extend_selection(tree: &Tree, rope: &Rope, current: Selection) -> Option<
                 return Some(Selection::new(new_start, new_end));
             }
         }
-        match node.parent() {
-            Some(p) => node = p,
-            None => return None,
+        {
+            let p = node.parent()?;
+            node = p
         }
     }
 }

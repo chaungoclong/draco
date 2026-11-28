@@ -596,12 +596,11 @@ pub fn show_code_view(
                     ui.close_menu();
                 }
                 if ui.button("Paste             Ctrl+V").clicked() {
-                    if let Some(cb) = clipboard.as_mut() {
-                        if let Ok(text) = cb.get_text() {
+                    if let Some(cb) = clipboard.as_mut()
+                        && let Ok(text) = cb.get_text() {
                             editing::insert_text(doc, &text.replace("\r\n", "\n"));
                             ctx_changed = true;
                         }
-                    }
                     ui.close_menu();
                 }
                 ui.separator();
@@ -643,8 +642,8 @@ pub fn show_code_view(
             }
 
             // 9. Hover diagnostic tooltip
-            if let Some(hover_pos) = response.hover_pos() {
-                if hover_pos.x > gutter_rect.right() {
+            if let Some(hover_pos) = response.hover_pos()
+                && hover_pos.x > gutter_rect.right() {
                     let h_line = ((hover_pos.y - origin.y) / line_height).floor().max(0.0) as usize;
                     let h_col = ((hover_pos.x - text_origin_x) / char_width).floor().max(0.0) as usize;
                     if let Some(diag) = diagnostics.iter().find(|d| {
@@ -662,7 +661,6 @@ pub fn show_code_view(
                         );
                     }
                 }
-            }
                     });
                 },
             );
@@ -725,13 +723,12 @@ pub fn show_code_view(
                 if ruler_resp.hovered() {
                     ui.ctx().set_cursor_icon(CursorIcon::PointingHand);
                 }
-                if (ruler_resp.clicked() || ruler_resp.dragged()) && ruler_rect.height() > 1.0 {
-                    if let Some(pos) = ruler_resp.interact_pointer_pos() {
+                if (ruler_resp.clicked() || ruler_resp.dragged()) && ruler_rect.height() > 1.0
+                    && let Some(pos) = ruler_resp.interact_pointer_pos() {
                         let ratio = ((pos.y - ruler_rect.min.y) / ruler_rect.height()).clamp(0.0, 1.0);
                         let target = (ratio * (total_lines.saturating_sub(1)) as f32).round() as usize;
                         state.scroll_to_line = Some(target);
                     }
-                }
             }
         });
     });
@@ -873,18 +870,17 @@ fn handle_mouse(
         (line, col, ch)
     };
 
-    if response.double_clicked() {
-        if let Some(pos) = response.interact_pointer_pos() {
+    if response.double_clicked()
+        && let Some(pos) = response.interact_pointer_pos() {
             let (_, _, ch) = pos_to_char(pos, doc);
             let r = editing::word_range_at(&doc.rope, ch);
             doc.selections
                 .set_single(Selection::new(r.start, r.end), doc.len_chars());
             return;
         }
-    }
 
-    if response.triple_clicked() {
-        if let Some(pos) = response.interact_pointer_pos() {
+    if response.triple_clicked()
+        && let Some(pos) = response.interact_pointer_pos() {
             let (line, _, _) = pos_to_char(pos, doc);
             let start = doc.rope.line_to_char(line);
             let end = start + doc.line_len_chars_without_newline(line);
@@ -892,7 +888,6 @@ fn handle_mouse(
                 .set_single(Selection::new(start, end), doc.len_chars());
             return;
         }
-    }
 
     let mods = ui.input(|i| i.modifiers);
     if response.is_pointer_button_down_on() {
@@ -1018,11 +1013,10 @@ fn handle_key_press(
                 return;
             }
             Key::V => {
-                if let Some(cb) = clipboard.as_mut() {
-                    if let Ok(text) = cb.get_text() {
+                if let Some(cb) = clipboard.as_mut()
+                    && let Ok(text) = cb.get_text() {
                         editing::insert_text(doc, &text.replace("\r\n", "\n"));
                     }
-                }
                 return;
             }
             Key::ArrowLeft => {

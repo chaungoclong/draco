@@ -31,11 +31,10 @@ fn workspace_watcher_detects_external_modify_and_reloads_document() {
     let deadline = Instant::now() + Duration::from_secs(3);
     while Instant::now() < deadline && !saw_modify {
         for ev in watcher.poll_events() {
-            if let WatchEvent::FileModified(p) = ev {
-                if fs::canonicalize(&p).ok() == fs::canonicalize(&file_path).ok() {
+            if let WatchEvent::FileModified(p) = ev
+                && fs::canonicalize(&p).ok() == fs::canonicalize(&file_path).ok() {
                     saw_modify = true;
                 }
-            }
         }
         std::thread::sleep(Duration::from_millis(20));
     }

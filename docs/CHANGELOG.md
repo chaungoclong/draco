@@ -5,6 +5,8 @@ Tất cả thay đổi đáng chú ý của **Draco** đều được ghi nhận
 ## [Unreleased]
 
 ### Added
+- **Rust Linter (`clippy` + `rustfmt`) & CI Lint Gate**:
+  - Thêm cấu hình `clippy.toml`, `rustfmt.toml`, bổ sung cổng `cargo clippy --all-targets -- -D warnings` vào `.github/workflows/ci.yml`, `docs/task-workflow.md` và `AGENTS.md`, đồng thời xử lý sạch toàn bộ cảnh báo Clippy trên mã nguồn.
 - **Cross-Platform Release Pipeline & End-User Installers ([Spec 008](./specs/008-release-pipeline-and-distribution.md))**:
   - Thêm `.github/workflows/release.yml` tự động build & xuất bản GitHub Release khi đẩy tag `v*` cho **Linux x86_64** (`.tar.gz` + `.deb` kèm icon), **macOS Apple Silicon & Intel** (`.tar.gz`) và **Windows x86_64** (bộ cài Inno Setup `draco-*-x86_64-setup.exe` + `.exe` portable nhúng icon + `.zip`) kèm `SHA256SUMS.txt`.
   - Thêm bộ App Icon Rồng xanh mint & lửa chính thức (`assets/icons/draco.png`, `draco.ico`) hiển thị trên cửa sổ `eframe`, Linux `.desktop` / `.deb` và Windows `.exe` / bộ cài `packaging/windows/draco.iss`.

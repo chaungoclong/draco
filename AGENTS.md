@@ -5,9 +5,10 @@
 
 ## Task Execution Workflow (Mandatory)
 - Follow [docs/task-workflow.md](docs/task-workflow.md) for every feature, bugfix, or refactor (`analyzing → planning → in_progress → ready_for_test → ready_for_review → done`).
+- **Task tracking (`tasks/`)**: Every task MUST have a numbered file `tasks/NNN-<topic>.md` and be listed in [tasks/INDEX.md](tasks/INDEX.md).
 - `main` is protected: always sync `origin/main` first and checkout a clear, descriptive branch (e.g., `feat/<topic>`, `fix/<topic>`, `ci/<topic>`, `docs/<topic>`).
 - **Always ask for approval before `git push`**: never run `git push` without explicit user confirmation (unless the user explicitly requested pushing in the current prompt).
-- **Test integrity (Non-Negotiable)**: never weaken, skip, or delete existing tests to pass; add dedicated tests for every new feature/fix and fix the implementation if a test fails.
+- **Test integrity (Non-Negotiable)**: never weaken, skip, or delete existing tests to pass; add dedicated tests for every new feature/fix. Existing tests may only be modified when a spec intentionally changes and the old test no longer matches the new spec — and **only after getting explicit developer approval first**.
 
 ## Core Engineering Principles
 1. **Performance First**:

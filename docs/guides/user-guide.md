@@ -21,8 +21,20 @@
 
 ---
 
-## 1. Khởi chạy & Mở dự án
+## 1. Cài đặt, Khởi chạy & Mở dự án
 
+### Cài đặt nhanh (Không cần cài Rust)
+- **Linux & macOS**:
+  ```sh
+  curl -fsSL https://raw.githubusercontent.com/chaungoclong/draco/main/scripts/install.sh | sh
+  ```
+- **Ubuntu / Debian (`.deb`)**: tải `draco_*_amd64.deb` tại [GitHub Releases](https://github.com/chaungoclong/draco/releases) rồi chạy `sudo apt install ./draco_*_amd64.deb`.
+- **Windows**: tải bộ cài `draco-*-x86_64-setup.exe` (hoặc bản portable `draco-*-x86_64-windows.exe`) từ [GitHub Releases](https://github.com/chaungoclong/draco/releases), hoặc cài 1 dòng qua PowerShell:
+  ```powershell
+  irm https://raw.githubusercontent.com/chaungoclong/draco/main/scripts/install.ps1 | iex
+  ```
+
+### Khởi chạy
 Bạn có thể mở Draco kèm thư mục dự án hoặc một file cụ thể ngay từ terminal:
 
 ```bash

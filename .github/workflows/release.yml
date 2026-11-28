@@ -1,0 +1,222 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g. v0.1.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build (${{ matrix.asset_target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            asset_target: x86_64-linux
+            archive: tar.gz
+            build_deb: true
+          - os: macos-14
+            target: aarch64-apple-darwin
+            asset_target: aarch64-macos
+            archive: tar.gz
+            build_deb: false
+          - os: macos-13
+            target: x86_64-apple-darwin
+            asset_target: x86_64-macos
+            archive: tar.gz
+            build_deb: false
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            asset_target: x86_64-windows
+            archive: zip
+            build_deb: false
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Resolve release tag
+        id: meta
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${GITHUB_REF_NAME}"
+          fi
+          VERSION="${TAG#v}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Install Linux GUI dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libxkbcommon-dev \
+            libgtk-3-dev \
+            libgl1-mesa-dev \
+            pkg-config \
+            dpkg
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build release binary
+        run: cargo build --release --locked --target ${{ matrix.target }}
+
+      - name: Package tar.gz (Linux / macOS)
+        if: matrix.archive == 'tar.gz'
+        shell: bash
+        run: |
+          STAGE="draco-${{ steps.meta.outputs.tag }}-${{ matrix.asset_target }}"
+          mkdir -p "dist/${STAGE}"
+          cp "target/${{ matrix.target }}/release/draco" "dist/${STAGE}/draco"
+          chmod +x "dist/${STAGE}/draco"
+          cp docs/guides/user-guide.md "dist/${STAGE}/USER_GUIDE.md"
+          if [ "${{ runner.os }}" = "Linux" ]; then
+            cp packaging/linux/draco.desktop "dist/${STAGE}/draco.desktop"
+            cp assets/icons/draco.png "dist/${STAGE}/draco.png"
+          fi
+          tar -C dist -czf "dist/${STAGE}.tar.gz" "${STAGE}"
+          rm -rf "dist/${STAGE}"
+
+      - name: Package .deb (Ubuntu / Debian)
+        if: matrix.build_deb == true
+        shell: bash
+        run: |
+          VER="${{ steps.meta.outputs.version }}"
+          PKG_DIR="dist/deb_pkg"
+          mkdir -p "${PKG_DIR}/DEBIAN" "${PKG_DIR}/usr/bin" "${PKG_DIR}/usr/share/applications" "${PKG_DIR}/usr/share/icons/hicolor/256x256/apps"
+          cp "target/${{ matrix.target }}/release/draco" "${PKG_DIR}/usr/bin/draco"
+          chmod 0755 "${PKG_DIR}/usr/bin/draco"
+          cp packaging/linux/draco.desktop "${PKG_DIR}/usr/share/applications/draco.desktop"
+          cp assets/icons/draco.png "${PKG_DIR}/usr/share/icons/hicolor/256x256/apps/draco.png"
+          cat > "${PKG_DIR}/DEBIAN/control" <<EOF
+          Package: draco
+          Version: ${VER}
+          Section: editors
+          Priority: optional
+          Architecture: amd64
+          Depends: libgtk-3-0, libxkbcommon0, libgl1
+          Maintainer: Draco Contributors <https://github.com/chaungoclong/draco>
+          Description: Lightweight GPU-accelerated Rust code editor
+           Draco is a fast, native code editor built with Rust, egui, ropey,
+           tree-sitter, LSP, embedded PTY terminal, and Markdown/Mermaid preview.
+          EOF
+          dpkg-deb --build "${PKG_DIR}" "dist/draco_${VER}_amd64.deb"
+          rm -rf "${PKG_DIR}"
+
+      - name: Embed icon into Windows .exe & build Inno Setup installer
+        if: matrix.archive == 'zip'
+        shell: pwsh
+        run: |
+          $tag = "${{ steps.meta.outputs.tag }}"
+          $ver = "${{ steps.meta.outputs.version }}"
+          $exe = "target\${{ matrix.target }}\release\draco.exe"
+
+          # Embed Draco icon & version metadata directly into draco.exe
+          choco install rcedit -y --no-progress
+          rcedit $exe `
+            --set-icon "assets\icons\draco.ico" `
+            --set-version-string "ProductName" "Draco Code Editor" `
+            --set-version-string "FileDescription" "Lightweight GPU-accelerated Rust code editor" `
+            --set-file-version "$ver.0" `
+            --set-product-version "$ver.0"
+
+          # Package standalone portable .exe and .zip
+          $stage = "draco-$tag-${{ matrix.asset_target }}"
+          New-Item -ItemType Directory -Force -Path "dist\$stage" | Out-Null
+          Copy-Item $exe "dist\$stage.exe"
+          Copy-Item $exe "dist\$stage\draco.exe"
+          Copy-Item "docs\guides\user-guide.md" "dist\$stage\USER_GUIDE.md"
+          Compress-Archive -Path "dist\$stage\*" -DestinationPath "dist\$stage.zip" -Force
+          Remove-Item -Recurse -Force "dist\$stage"
+
+          # Build native Windows installer (draco-<tag>-x86_64-setup.exe) via Inno Setup
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            choco install innosetup -y --no-progress
+          }
+          & $iscc /DMyAppVersion="$ver" /DMyAppTag="$tag" /DMyExePath="..\..\$exe" "packaging\windows\draco.iss"
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.asset_target }}
+          path: dist/*
+
+  publish:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve release tag
+        id: meta
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${GITHUB_REF_NAME}"
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Generate SHA256SUMS.txt
+        working-directory: release-assets
+        run: sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: Draco ${{ steps.meta.outputs.tag }}
+          generate_release_notes: true
+          body: |
+            ## Quick Install (No Rust Required)
+
+            ### Linux & macOS (1-line installer)
+            ```sh
+            curl -fsSL https://raw.githubusercontent.com/chaungoclong/draco/main/scripts/install.sh | sh
+            ```
+
+            ### Ubuntu / Debian (`.deb`)
+            Download `draco_*_amd64.deb` below and install:
+            ```sh
+            sudo apt install ./draco_*_amd64.deb
+            ```
+
+            ### Windows (Installer `.exe`, Portable `.exe`, or PowerShell)
+            - **Recommended (Full Installer)**: Download and run `draco-*-x86_64-setup.exe` (Start Menu, Desktop icon, PATH, "Open with Draco" context menu, Uninstaller — no Admin required).
+            - **Portable**: Download `draco-*-x86_64-windows.exe` to run directly.
+            - **PowerShell 1-line**:
+            ```powershell
+            irm https://raw.githubusercontent.com/chaungoclong/draco/main/scripts/install.ps1 | iex
+            ```
+          files: release-assets/*

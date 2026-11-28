@@ -17,6 +17,7 @@ Chào mừng đến với trung tâm tài liệu của **Draco** — GUI code ed
 - **[specs/005-ast-navigation-and-sticky-scroll.md](./specs/005-ast-navigation-and-sticky-scroll.md)** — AST Selection, Code Symbols, Sticky Scroll & Unified Quick Open (`Files | Recent | Symbols`).
 - **[specs/006-workspace-search-split-editor-overview-ruler.md](./specs/006-workspace-search-split-editor-overview-ruler.md)** — Workspace Find & Replace, Split Editor & Overview Ruler.
 - **[specs/007-lsp-ide-actions-and-git-gutter.md](./specs/007-lsp-ide-actions-and-git-gutter.md)** — LSP Quick-Fix, Rename, Inlay Hints, Signature Help & Git Gutter.
+- **[specs/008-release-pipeline-and-distribution.md](./specs/008-release-pipeline-and-distribution.md)** — Quy trình phát hành đa nền tảng (`.deb`, `.tar.gz`, `.zip`, `SHA256SUMS.txt`) & script cài đặt 1 dòng lệnh.
 
 ### Guides (`docs/guides/`)
 - **[guides/user-guide.md](./guides/user-guide.md)** — **Hướng dẫn sử dụng chi tiết cho người dùng cuối** (từng bước làm chủ mọi tính năng của Draco).

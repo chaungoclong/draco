@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=Draco
+GenericName=Code Editor
+Comment=Lightweight, fast, GPU-accelerated Rust code editor
+Exec=draco %F
+Icon=draco
+Terminal=false
+Type=Application
+Categories=Development;TextEditor;IDE;
+StartupNotify=true
+MimeType=text/plain;text/x-csrc;text/x-c++src;text/x-python;text/x-rust;text/markdown;application/json;application/javascript;
+Keywords=code;editor;rust;ide;markdown;terminal;

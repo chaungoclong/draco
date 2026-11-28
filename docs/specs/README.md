@@ -21,3 +21,4 @@ Thư mục này lưu trữ các tài liệu đặc tả kỹ thuật cho từng 
 | 005 | AST Selection, Code Symbols, Sticky Scroll & Unified Quick Open | Implemented | [005-ast-navigation-and-sticky-scroll.md](./005-ast-navigation-and-sticky-scroll.md) |
 | 006 | Workspace Find & Replace, Split Editor & Overview Ruler | Implemented | [006-workspace-search-split-editor-overview-ruler.md](./006-workspace-search-split-editor-overview-ruler.md) |
 | 007 | LSP IDE Actions (Quick-Fix, Rename, Inlay Hints, Signature Help) & Git Gutter | Implemented | [007-lsp-ide-actions-and-git-gutter.md](./007-lsp-ide-actions-and-git-gutter.md) |
+| 008 | Cross-Platform Release Pipeline & End-User Distribution | Implemented | [008-release-pipeline-and-distribution.md](./008-release-pipeline-and-distribution.md) |

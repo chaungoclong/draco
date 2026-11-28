@@ -12,7 +12,9 @@ use crate::core::search;
 use crate::core::selection::{Selection, SelectionSet};
 use crate::core::LanguageId;
 use crate::keymap::{self, AppAction};
-use crate::lsp::client::{DiagnosticItem, LspEvent, LspManager};
+use crate::lsp::client::{
+    DiagnosticItem, InlayHintItem, LspEvent, LspManager, SignatureHelpInfo, TextEditItem,
+};
 use crate::plugins::{PluginContext, PluginInputMode, PluginManager, PluginOutputMode};
 use crate::settings::{Settings, TerminalLayout};
 use crate::syntax::SyntaxState;
@@ -25,6 +27,7 @@ use crate::ui::explorer::{self, ExplorerAction, ExplorerUiState};
 use crate::ui::find_bar::{self, FindAction, FindBarState};
 use crate::ui::fonts;
 use crate::ui::icons::{self, ActivityIcon};
+use crate::ui::lsp_popups::{self, CodeActionPopupState, RenameModalState};
 use crate::ui::markdown_preview::{self, MarkdownPreviewCache, MarkdownViewMode, PreviewAction};
 use crate::ui::quick_open::{self, QuickOpenAction, QuickOpenState, QuickOpenTab};
 use crate::ui::settings_modal::{self, SettingsModalAction, SettingsModalState};
@@ -34,6 +37,7 @@ use crate::ui::terminal_panel::{self, TerminalUiAction};
 use crate::ui::workspace_search::{self, WorkspaceSearchAction, WorkspaceSearchUiState};
 use crate::workspace::file_tree::FileTree;
 use crate::workspace::fuzzy::WorkspaceIndexer;
+use crate::workspace::git_diff::GitDiffTracker;
 use crate::workspace::search::{replace_in_workspace, WorkspaceSearcher};
 use crate::workspace::watcher::{WatchEvent, WorkspaceWatcher};
 
@@ -83,6 +87,11 @@ pub struct DracoApp {
     last_tree_refresh: Instant,
     lsp: LspManager,
     diagnostics: HashMap<PathBuf, Vec<DiagnosticItem>>,
+    inlay_hints: HashMap<PathBuf, Vec<InlayHintItem>>,
+    code_actions: CodeActionPopupState,
+    rename_modal: RenameModalState,
+    signature_help: Option<SignatureHelpInfo>,
+    git_diff: GitDiffTracker,
     terminal: TerminalManager,
     show_sidebar: bool,
     show_terminal: bool,
@@ -144,6 +153,11 @@ impl DracoApp {
             last_tree_refresh: Instant::now(),
             lsp: LspManager::new(Arc::clone(&repaint)),
             diagnostics: HashMap::new(),
+            inlay_hints: HashMap::new(),
+            code_actions: CodeActionPopupState::default(),
+            rename_modal: RenameModalState::default(),
+            signature_help: None,
+            git_diff: GitDiffTracker::default(),
             terminal: TerminalManager::new(terminal_layout),
             show_sidebar: true,
             show_terminal: false,
@@ -296,7 +310,12 @@ impl DracoApp {
         match Document::from_file(id, canonical.clone()) {
             Ok(doc) => {
                 let text = doc.rope.to_string();
+                let total_lines = doc.len_lines();
                 self.lsp.did_open(doc.language, &canonical, doc.version, &text);
+                self.lsp
+                    .request_inlay_hints(doc.language, &canonical, 0, total_lines.min(400));
+                self.git_diff
+                    .request_refresh(canonical.clone(), Arc::clone(&self.repaint));
                 if self.tabs.len() == 1
                     && self.tabs[0].doc.path.is_none()
                     && !self.tabs[0].doc.dirty
@@ -339,6 +358,8 @@ impl DracoApp {
                 tab.last_edit = None;
                 if let Some(p) = &tab.doc.path {
                     self.lsp.did_save(tab.doc.language, p);
+                    self.git_diff
+                        .request_refresh(p.clone(), Arc::clone(&self.repaint));
                     self.status_message = Some(format!("Saved {}", p.display()));
                 }
             }
@@ -679,7 +700,51 @@ impl DracoApp {
         }
     }
 
+    fn apply_workspace_edits(&mut self, edits: HashMap<PathBuf, Vec<TextEditItem>>) {
+        let mut total_applied = 0usize;
+        for (raw_path, file_edits) in edits {
+            let canon = fs::canonicalize(&raw_path).unwrap_or(raw_path);
+            if let Some(tab) = self
+                .tabs
+                .iter_mut()
+                .find(|t| t.doc.path.as_deref() == Some(canon.as_path()))
+            {
+                let mut char_edits: Vec<(std::ops::Range<usize>, String)> = file_edits
+                    .iter()
+                    .map(|e| {
+                        let s = tab.doc.line_col_to_char(e.start_line, e.start_col);
+                        let en = tab.doc.line_col_to_char(e.end_line, e.end_col);
+                        (s.min(en)..s.max(en), e.new_text.clone())
+                    })
+                    .collect();
+                char_edits.sort_by(|a, b| b.0.start.cmp(&a.0.start));
+                let cur = tab.doc.selections.clone();
+                total_applied += char_edits.len();
+                tab.doc.apply_edits(char_edits, cur, EditKind::Other);
+                tab.last_edit = Some(Instant::now());
+            } else if let Ok(mut doc) = Document::from_file(0, canon.clone()) {
+                let mut char_edits: Vec<(std::ops::Range<usize>, String)> = file_edits
+                    .iter()
+                    .map(|e| {
+                        let s = doc.line_col_to_char(e.start_line, e.start_col);
+                        let en = doc.line_col_to_char(e.end_line, e.end_col);
+                        (s.min(en)..s.max(en), e.new_text.clone())
+                    })
+                    .collect();
+                char_edits.sort_by(|a, b| b.0.start.cmp(&a.0.start));
+                let cur = doc.selections.clone();
+                total_applied += char_edits.len();
+                doc.apply_edits(char_edits, cur, EditKind::Other);
+                let _ = doc.save();
+            }
+        }
+        if total_applied > 0 {
+            self.status_message = Some(format!("Applied {total_applied} LSP edits"));
+        }
+    }
+
     fn handle_lsp_events(&mut self) {
+        let mut pending_edits = Vec::new();
         for ev in self.lsp.poll_events() {
             match ev {
                 LspEvent::Diagnostics { path, items } => {
@@ -699,10 +764,30 @@ impl DracoApp {
                         tab.view.scroll_to_line = Some(line);
                     }
                 }
+                LspEvent::CodeActions { items } => {
+                    if items.is_empty() {
+                        self.status_message = Some("No code actions available".to_string());
+                    } else {
+                        self.code_actions.show(items);
+                    }
+                }
+                LspEvent::RenameEdits { edits } => {
+                    pending_edits.push(edits);
+                }
+                LspEvent::InlayHints { path, items } => {
+                    let canon = fs::canonicalize(&path).unwrap_or(path);
+                    self.inlay_hints.insert(canon, items);
+                }
+                LspEvent::SignatureHelp { info } => {
+                    self.signature_help = info;
+                }
                 LspEvent::Status { status, .. } => {
                     self.status_message = Some(status);
                 }
             }
+        }
+        for edits in pending_edits {
+            self.apply_workspace_edits(edits);
         }
     }
 
@@ -839,6 +924,25 @@ impl DracoApp {
                         self.lsp
                             .request_completion(tab.doc.language, path, line, col);
                     }
+                }
+            }
+            AppAction::TriggerCodeAction => {
+                if let Some(tab) = self.tabs.get(self.active_tab) {
+                    if let Some(path) = &tab.doc.path {
+                        let (line, col) =
+                            tab.doc.char_to_line_col(tab.doc.selections.primary().head);
+                        self.lsp
+                            .request_code_actions(tab.doc.language, path, line, col);
+                    }
+                }
+            }
+            AppAction::RenameSymbol => {
+                if let Some(tab) = self.tabs.get(self.active_tab) {
+                    let head = tab.doc.selections.primary().head;
+                    let r = editing::word_range_at(&tab.doc.rope, head);
+                    let word = tab.doc.rope.slice(r).to_string();
+                    self.rename_modal.show(word);
+                    self.terminal_focused = false;
                 }
             }
             AppAction::ZoomIn => {
@@ -1364,6 +1468,8 @@ impl eframe::App for DracoApp {
             && !self.settings_modal.open
             && !self.terminal_focused
             && !self.completion.open
+            && !self.code_actions.open
+            && !self.rename_modal.open
             && !ctx.wants_keyboard_input();
 
         let active_doc_path = self
@@ -1718,6 +1824,17 @@ impl eframe::App for DracoApp {
                         self.split_tab = Some(next_right_idx);
                     }
                 } else if let Some(tab) = self.tabs.get_mut(self.active_tab) {
+                    if let Some(p) = &tab.doc.path {
+                        tab.view.git_changes = self.git_diff.changes_for(p);
+                        tab.view.inlay_hints = self
+                            .inlay_hints
+                            .get(p)
+                            .cloned()
+                            .unwrap_or_default();
+                    } else {
+                        tab.view.git_changes.clear();
+                        tab.view.inlay_hints.clear();
+                    }
                     let diags: Vec<DiagnosticItem> = tab
                         .doc
                         .path
@@ -1817,6 +1934,17 @@ impl eframe::App for DracoApp {
                                         tab.doc.char_to_line_col(tab.doc.selections.primary().head);
                                     self.lsp.request_completion(tab.doc.language, &path, l, c);
                                 }
+                                if out.trigger_signature_char {
+                                    let (l, c) =
+                                        tab.doc.char_to_line_col(tab.doc.selections.primary().head);
+                                    self.lsp.request_signature_help(tab.doc.language, &path, l, c);
+                                }
+                                self.lsp.request_inlay_hints(
+                                    tab.doc.language,
+                                    &path,
+                                    0,
+                                    tab.doc.len_lines().min(400),
+                                );
                             }
                             if self.find_bar.open {
                                 need_recompute_search = true;
@@ -1894,7 +2022,7 @@ impl eframe::App for DracoApp {
             self.handle_terminal_action(ctx, t_act);
         }
 
-        // 8. Floating Completion Popup
+        // 8. Floating Completion Popup + LSP Code Actions, Rename & Signature Help
         if let Some(inserted) =
             completion::show_completion_popup(ctx, &mut self.completion, cursor_anchor, &self.theme)
         {
@@ -1903,6 +2031,38 @@ impl eframe::App for DracoApp {
                 tab.last_edit = Some(Instant::now());
             }
         }
+        if let Some(action) = lsp_popups::show_code_action_popup(
+            ctx,
+            &mut self.code_actions,
+            cursor_anchor,
+            &self.theme,
+        ) {
+            if !action.edits.is_empty() {
+                self.apply_workspace_edits(action.edits);
+            }
+        }
+        if let Some(new_name) =
+            lsp_popups::show_rename_modal(ctx, &mut self.rename_modal, &self.theme)
+        {
+            if let Some(tab) = self.tabs.get(self.active_tab) {
+                if let Some(path) = &tab.doc.path {
+                    let (line, col) =
+                        tab.doc.char_to_line_col(tab.doc.selections.primary().head);
+                    self.lsp
+                        .request_rename(tab.doc.language, path, line, col, &new_name);
+                    self.status_message = Some(format!("Renaming symbol to `{new_name}`…"));
+                }
+            }
+        }
+        if ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
+            self.signature_help = None;
+        }
+        lsp_popups::show_signature_help_tooltip(
+            ctx,
+            self.signature_help.as_ref(),
+            cursor_anchor,
+            &self.theme,
+        );
 
         // 9. Unified Quick Open Modal (Ctrl+P Files | Ctrl+E Recent | Ctrl+R Symbols)
         let root_path: Option<&Path> = self.file_tree.as_ref().map(|t| t.root.as_path());

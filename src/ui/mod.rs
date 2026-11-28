@@ -5,6 +5,7 @@ pub mod explorer;
 pub mod find_bar;
 pub mod fonts;
 pub mod icons;
+pub mod lsp_popups;
 pub mod markdown_preview;
 pub mod mermaid;
 pub mod quick_open;

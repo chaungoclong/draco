@@ -18,4 +18,6 @@ Thư mục này lưu trữ các tài liệu đặc tả kỹ thuật cho từng 
 | 002 | Multi-Tab Terminal, Settings, Auto-Save, Plugins & PHP | Implemented | [002-multi-terminal-settings-plugins-php.md](./002-multi-terminal-settings-plugins-php.md) |
 | 003 | Config Highlighting & High-Performance Markdown Preview | Implemented | [003-config-highlighting-markdown-preview.md](./003-config-highlighting-markdown-preview.md) |
 | 004 | Native Ecosystem Library Upgrades (`nucleo-matcher`, `fontdb`, `directories`, `notify`) | Implemented | [004-native-ecosystem-upgrades.md](./004-native-ecosystem-upgrades.md) |
-| 005 | VS Code + JetBrains IDE Roadmap & Phase 1 (AST Selection, Symbols, Sticky Scroll, Recent Files) | Implemented | [005-vscode-jetbrains-ide-roadmap.md](./005-vscode-jetbrains-ide-roadmap.md) |
+| 005 | AST Selection, Code Symbols, Sticky Scroll & Unified Quick Open | Implemented | [005-ast-navigation-and-sticky-scroll.md](./005-ast-navigation-and-sticky-scroll.md) |
+| 006 | Workspace Find & Replace, Split Editor & Overview Ruler | Implemented | [006-workspace-search-split-editor-overview-ruler.md](./006-workspace-search-split-editor-overview-ruler.md) |
+| 007 | LSP IDE Actions (Quick-Fix, Rename, Inlay Hints, Signature Help) & Git Gutter | Implemented | [007-lsp-ide-actions-and-git-gutter.md](./007-lsp-ide-actions-and-git-gutter.md) |

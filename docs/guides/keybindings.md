@@ -49,6 +49,8 @@ Draco sử dụng bộ phím tắt chuẩn hiện đại (VS Code / Sublime). Tr
 | `Ctrl+F` / `Ctrl+H` | Mở Find / Find & Replace trong file hiện tại |
 | `Ctrl+Shift+F` | Mở Find & Replace toàn Workspace (tôn trọng `.gitignore`) |
 | `Ctrl+Space` | Gọi gợi ý LSP Autocomplete |
+| `Alt+Enter` | Mở Quick-Fix / LSP Code Actions |
+| `F2` | Đổi tên biểu tượng toàn workspace (LSP Rename) |
 | `F12` hoặc `Ctrl+Click` | Go to Definition |
 
 ## Context Menu (Chuột phải)

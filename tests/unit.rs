@@ -14,6 +14,8 @@ mod lsp_transport_tests;
 mod markdown_preview_tests;
 #[path = "unit/mermaid_tests.rs"]
 mod mermaid_tests;
+#[path = "unit/phase3_lsp_git_tests.rs"]
+mod phase3_lsp_git_tests;
 #[path = "unit/plugins_tests.rs"]
 mod plugins_tests;
 #[path = "unit/search_tests.rs"]

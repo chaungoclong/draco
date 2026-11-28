@@ -26,6 +26,8 @@ pub enum AppAction {
     ToggleMarkdownPreview,
     GoToDefinition,
     TriggerCompletion,
+    TriggerCodeAction,
+    RenameSymbol,
     ZoomIn,
     ZoomOut,
     ZoomReset,
@@ -102,6 +104,12 @@ pub fn poll_global_action(ctx: &egui::Context) -> Option<AppAction> {
         }
         if i.consume_key(Modifiers::NONE, Key::F12) {
             return Some(AppAction::GoToDefinition);
+        }
+        if i.consume_key(Modifiers::NONE, Key::F2) {
+            return Some(AppAction::RenameSymbol);
+        }
+        if i.consume_key(Modifiers::ALT, Key::Enter) {
+            return Some(AppAction::TriggerCodeAction);
         }
         if i.consume_key(Modifiers::CTRL, Key::Space) {
             return Some(AppAction::TriggerCompletion);

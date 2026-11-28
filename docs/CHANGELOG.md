@@ -5,6 +5,10 @@ Tất cả thay đổi đáng chú ý của **Draco** đều được ghi nhận
 ## [Unreleased]
 
 ### Added
+- **Phase 3 IDE Ergonomics — LSP Quick-Fix, Rename, Inlay Hints, Signature Help & Git Gutter ([Spec 005](./specs/005-vscode-jetbrains-ide-roadmap.md))**:
+  - **Quick-Fix / Code Actions (`Alt+Enter`) & Rename Symbol (`F2`)** (`src/lsp/client.rs`, `src/ui/lsp_popups.rs`): hỗ trợ `textDocument/codeAction`, `textDocument/rename`, parse `WorkspaceEdit` (`changes`/`documentChanges`) và áp dụng an toàn UTF-8 theo thứ tự offset ngược.
+  - **Inlay Hints & Signature Help**: hiển thị gợi ý kiểu/tham số dạng pill mờ trong `CodeView` và tooltip chữ ký hàm phía trên con trỏ khi gõ `(` hoặc `,`.
+  - **Git Gutter Indicators (`src/workspace/git_diff.rs`)**: tính diff `git diff -U0` trên luồng nền và vẽ vạch màu Added (xanh lá), Modified (xanh dương), Deleted (đỏ) ngay cạnh số dòng.
 - **Phase 2 IDE Ergonomics — Workspace Search, Split Editor & Overview Ruler ([Spec 005](./specs/005-vscode-jetbrains-ide-roadmap.md))**:
   - **Workspace Find & Replace (`Ctrl+Shift+F`, `src/workspace/search.rs`, `src/ui/workspace_search.rs`)**: tìm kiếm toàn workspace trên luồng nền (`ignore` + `regex`, tôn trọng `.gitignore`, lọc Include/Exclude, click nhảy tới dòng/cột, Replace All kèm tự reload tab đang mở).
   - **Split Editor (`Ctrl+\`)**: chia 2 pane song song cho mọi file code với cuộn độc lập, thanh chuyển tab nhanh trên pane phải và viền accent nhận biết pane đang focus.

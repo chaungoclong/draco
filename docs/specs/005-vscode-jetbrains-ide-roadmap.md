@@ -1,6 +1,6 @@
 # Spec 005 — Lộ trình IDE (Chọn lọc tinh hoa VS Code + JetBrains) & Đợt 1
 
-- **Trạng thái**: In Progress (Đợt 1 & Đợt 2 Implemented)
+- **Trạng thái**: Implemented (Đợt 1, Đợt 2 & Đợt 3 Implemented)
 - **Ngày tạo**: 2026-11-28
 
 ## 1. Bối cảnh & Triết lý sản phẩm
@@ -34,10 +34,10 @@
 - **Split Editor (`Ctrl+\`)**: chia 2 pane song song cho mọi file code (kể cả xem 2 vị trí khác nhau của cùng 1 file với `scroll_salt` độc lập), có thanh chuyển tab cho pane phải và viền nhấn nhận biết pane đang focus.
 - **Overview Ruler trong `CodeView`**: thanh dọc 10px bên mép phải hiển thị chấm lỗi LSP (đỏ), cảnh báo (vàng), kết quả Find (accent) và vị trí con trỏ chính; click/kéo để nhảy nhanh tới bất kỳ dòng nào.
 
-### Đợt 3 — Nâng cấp LSP lên tầm IDE & Git Inline (Kế hoạch)
-- **Quick-Fix / Code Actions (`Alt+Enter`)** & **Rename Symbol (`F2`)**.
-- **Inlay Hints** (kiểu biến & tên tham số) + **Signature Help**.
-- **Git Gutter Indicators** (vạch màu added / modified / deleted bên lề số dòng).
+### Đợt 3 — Nâng cấp LSP lên tầm IDE & Git Inline ✅
+- **Quick-Fix / Code Actions (`Alt+Enter`) & Rename Symbol (`F2`)** (`src/lsp/client.rs`, `src/ui/lsp_popups.rs`): hỗ trợ đầy đủ `textDocument/codeAction`, `textDocument/rename`, parse `WorkspaceEdit` (`changes` và `documentChanges`), áp dụng chỉnh sửa theo thứ tự offset ngược an toàn UTF-8 cho cả tab đang mở lẫn file trên đĩa.
+- **Inlay Hints & Signature Help**: gửi `textDocument/inlayHint` và `textDocument/signatureHelp` (tự kích hoạt khi gõ `(` hoặc `,`), hiển thị Inlay Hints dạng pill mờ cuối dòng trong `CodeView` và tooltip Signature Help phía trên con trỏ.
+- **Git Gutter Indicators (`src/workspace/git_diff.rs`)**: chạy `git diff -U0` trên luồng nền (`GitDiffTracker`) và vẽ vạch màu 3px ngay mép lề số dòng trong `CodeView` (Xanh lá = Added, Xanh dương = Modified, Đỏ = Deleted).
 
 ---
 

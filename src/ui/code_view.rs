@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::ops::Range;
 
 use eframe::egui::{
@@ -9,11 +10,12 @@ use unicode_width::UnicodeWidthChar;
 use crate::core::buffer::Document;
 use crate::core::editing::{self, MoveDir};
 use crate::core::selection::Selection;
-use crate::lsp::client::DiagnosticItem;
+use crate::lsp::client::{DiagnosticItem, InlayHintItem};
 use crate::syntax::ast::AstSelectionHistory;
 use crate::syntax::symbols;
 use crate::syntax::{HighlightSpan, SyntaxState};
 use crate::theme::Theme;
+use crate::workspace::git_diff::GitLineChange;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CodeViewContextAction {
@@ -27,6 +29,7 @@ pub struct CodeViewOutput {
     pub request_definition: Option<(usize, usize)>,
     pub primary_cursor_screen_pos: Pos2,
     pub trigger_completion_char: bool,
+    pub trigger_signature_char: bool,
     pub context_action: Option<CodeViewContextAction>,
     pub top_visible_line: f32,
 }
@@ -40,6 +43,8 @@ pub struct CodeViewState {
     dragging: bool,
     pub ast_selection: AstSelectionHistory,
     last_top_visible_line: usize,
+    pub git_changes: HashMap<usize, GitLineChange>,
+    pub inlay_hints: Vec<InlayHintItem>,
 }
 
 impl Default for CodeViewState {
@@ -53,6 +58,8 @@ impl Default for CodeViewState {
             dragging: false,
             ast_selection: AstSelectionHistory::default(),
             last_top_visible_line: 0,
+            git_changes: HashMap::new(),
+            inlay_hints: Vec::new(),
         }
     }
 }
@@ -102,6 +109,7 @@ pub fn show_code_view(
         request_definition: None,
         primary_cursor_screen_pos: ui.min_rect().min,
         trigger_completion_char: false,
+        trigger_signature_char: false,
         context_action: None,
         top_visible_line: 0.0,
     };
@@ -406,7 +414,27 @@ pub fn show_code_view(
                 );
                 let galley = ui.fonts(|f| f.layout_job(job));
                 let pos = Pos2::new(text_origin_x, origin.y + line_idx as f32 * line_height + 2.0);
+                let line_end_x = text_origin_x + galley.size().x + 8.0;
                 painter.galley(pos, galley, theme.fg_text);
+
+                // Subtle inline LSP Inlay Hints (non-intrusive trailing pills on visible lines)
+                let mut hint_x = line_end_x;
+                for hint in state.inlay_hints.iter().filter(|h| h.line == line_idx) {
+                    let hint_font = FontId::monospace((state.font_size - 2.0).max(10.0));
+                    let h_galley =
+                        ui.fonts(|f| f.layout_no_wrap(hint.label.clone(), hint_font, theme.fg_muted));
+                    let pill_rect = Rect::from_min_size(
+                        Pos2::new(hint_x, origin.y + line_idx as f32 * line_height + 2.0),
+                        Vec2::new(h_galley.size().x + 8.0, (line_height - 4.0).max(12.0)),
+                    );
+                    painter.rect_filled(pill_rect, 3.0, theme.bg_panel);
+                    painter.galley(
+                        Pos2::new(pill_rect.min.x + 4.0, pill_rect.min.y + 1.0),
+                        h_galley,
+                        theme.fg_muted,
+                    );
+                    hint_x = pill_rect.max.x + 4.0;
+                }
             }
 
             // 6. LSP Diagnostic underlines
@@ -483,6 +511,42 @@ pub fn show_code_view(
                     font_id.clone(),
                     col,
                 );
+                // Git Gutter Indicator bar (Added = green, Modified = accent blue, Deleted = red)
+                if let Some(change) = state.git_changes.get(&line_idx) {
+                    let line_top = origin.y + line_idx as f32 * line_height;
+                    match change {
+                        GitLineChange::Added => {
+                            painter.rect_filled(
+                                Rect::from_min_size(
+                                    Pos2::new(gutter_rect.right() - 3.5, line_top + 1.0),
+                                    Vec2::new(3.0, line_height - 2.0),
+                                ),
+                                1.0,
+                                Color32::from_rgb(106, 190, 96),
+                            );
+                        }
+                        GitLineChange::Modified => {
+                            painter.rect_filled(
+                                Rect::from_min_size(
+                                    Pos2::new(gutter_rect.right() - 3.5, line_top + 1.0),
+                                    Vec2::new(3.0, line_height - 2.0),
+                                ),
+                                1.0,
+                                theme.accent,
+                            );
+                        }
+                        GitLineChange::Deleted => {
+                            painter.rect_filled(
+                                Rect::from_min_size(
+                                    Pos2::new(gutter_rect.right() - 5.0, line_top + line_height - 3.0),
+                                    Vec2::new(5.0, 3.0),
+                                ),
+                                1.0,
+                                theme.diag_error,
+                            );
+                        }
+                    }
+                }
             }
 
             // Subtle welcome hint on completely empty untitled buffer
@@ -876,6 +940,9 @@ fn handle_keyboard(
                 if text.chars().all(|c| !c.is_control()) {
                     if text == "." || text == ":" {
                         output.trigger_completion_char = true;
+                    }
+                    if text == "(" || text == "," {
+                        output.trigger_signature_char = true;
                     }
                     editing::insert_text(doc, &text);
                 }

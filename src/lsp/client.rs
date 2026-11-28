@@ -29,6 +29,35 @@ pub struct CompletionCandidate {
     pub insert_text: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TextEditItem {
+    pub start_line: usize,
+    pub start_col: usize,
+    pub end_line: usize,
+    pub end_col: usize,
+    pub new_text: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CodeActionItem {
+    pub title: String,
+    pub kind: Option<String>,
+    pub edits: HashMap<PathBuf, Vec<TextEditItem>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InlayHintItem {
+    pub line: usize,
+    pub col: usize,
+    pub label: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SignatureHelpInfo {
+    pub label: String,
+    pub active_parameter: Option<usize>,
+}
+
 #[derive(Debug, Clone)]
 pub enum LspEvent {
     Diagnostics {
@@ -46,19 +75,36 @@ pub enum LspEvent {
         line: usize,
         col: usize,
     },
+    CodeActions {
+        items: Vec<CodeActionItem>,
+    },
+    RenameEdits {
+        edits: HashMap<PathBuf, Vec<TextEditItem>>,
+    },
+    InlayHints {
+        path: PathBuf,
+        items: Vec<InlayHintItem>,
+    },
+    SignatureHelp {
+        info: Option<SignatureHelpInfo>,
+    },
     Status {
         lang: LanguageId,
         status: String,
     },
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 #[allow(dead_code)]
 enum PendingKind {
     Initialize,
     Completion,
     Hover,
     Definition,
+    CodeAction,
+    Rename,
+    InlayHints(PathBuf),
+    SignatureHelp,
 }
 
 struct ServerHandle {
@@ -227,7 +273,11 @@ impl LspManager {
                     "textDocument": {
                         "completion": { "completionItem": { "snippetSupport": false } },
                         "hover": { "contentFormat": ["plaintext", "markdown"] },
-                        "publishDiagnostics": {}
+                        "publishDiagnostics": {},
+                        "codeAction": { "codeActionLiteralSupport": { "codeActionKind": { "valueSet": ["quickfix", "refactor", "source"] } } },
+                        "rename": { "prepareSupport": false },
+                        "inlayHint": {},
+                        "signatureHelp": { "signatureInformation": { "documentationFormat": ["plaintext"] } }
                     }
                 }
             }
@@ -350,6 +400,95 @@ impl LspManager {
             }
         });
         self.send_request(lang, id, PendingKind::Hover, msg);
+    }
+
+    pub fn request_code_actions(&self, lang: LanguageId, path: &Path, line: usize, col: usize) {
+        let Ok(uri) = Url::from_file_path(path) else {
+            return;
+        };
+        let id = self.next_id.fetch_add(1, Ordering::Relaxed);
+        let msg = json!({
+            "jsonrpc": "2.0",
+            "id": id,
+            "method": "textDocument/codeAction",
+            "params": {
+                "textDocument": { "uri": uri.to_string() },
+                "range": {
+                    "start": { "line": line, "character": col },
+                    "end": { "line": line, "character": col }
+                },
+                "context": { "diagnostics": [] }
+            }
+        });
+        self.send_request(lang, id, PendingKind::CodeAction, msg);
+    }
+
+    pub fn request_rename(
+        &self,
+        lang: LanguageId,
+        path: &Path,
+        line: usize,
+        col: usize,
+        new_name: &str,
+    ) {
+        let Ok(uri) = Url::from_file_path(path) else {
+            return;
+        };
+        let id = self.next_id.fetch_add(1, Ordering::Relaxed);
+        let msg = json!({
+            "jsonrpc": "2.0",
+            "id": id,
+            "method": "textDocument/rename",
+            "params": {
+                "textDocument": { "uri": uri.to_string() },
+                "position": { "line": line, "character": col },
+                "newName": new_name
+            }
+        });
+        self.send_request(lang, id, PendingKind::Rename, msg);
+    }
+
+    pub fn request_inlay_hints(
+        &self,
+        lang: LanguageId,
+        path: &Path,
+        start_line: usize,
+        end_line: usize,
+    ) {
+        let Ok(uri) = Url::from_file_path(path) else {
+            return;
+        };
+        let id = self.next_id.fetch_add(1, Ordering::Relaxed);
+        let msg = json!({
+            "jsonrpc": "2.0",
+            "id": id,
+            "method": "textDocument/inlayHint",
+            "params": {
+                "textDocument": { "uri": uri.to_string() },
+                "range": {
+                    "start": { "line": start_line, "character": 0 },
+                    "end": { "line": end_line, "character": 0 }
+                }
+            }
+        });
+        self.send_request(lang, id, PendingKind::InlayHints(path.to_path_buf()), msg);
+    }
+
+    pub fn request_signature_help(&self, lang: LanguageId, path: &Path, line: usize, col: usize) {
+        let Ok(uri) = Url::from_file_path(path) else {
+            return;
+        };
+        let id = self.next_id.fetch_add(1, Ordering::Relaxed);
+        let msg = json!({
+            "jsonrpc": "2.0",
+            "id": id,
+            "method": "textDocument/signatureHelp",
+            "params": {
+                "textDocument": { "uri": uri.to_string() },
+                "position": { "line": line, "character": col }
+            }
+        });
+        self.send_request(lang, id, PendingKind::SignatureHelp, msg);
     }
 }
 
@@ -476,5 +615,125 @@ fn handle_incoming(
                 let _ = tx_ev.send(LspEvent::Hover { text });
             }
         }
+        PendingKind::CodeAction => {
+            let mut items = Vec::new();
+            if let Some(arr) = result.as_array() {
+                for entry in arr.iter().take(20) {
+                    let title = entry["title"].as_str().unwrap_or("").to_string();
+                    if title.is_empty() {
+                        continue;
+                    }
+                    let kind = entry["kind"].as_str().map(|s| s.to_string());
+                    let edits = parse_workspace_edit(&entry["edit"]);
+                    items.push(CodeActionItem { title, kind, edits });
+                }
+            }
+            let _ = tx_ev.send(LspEvent::CodeActions { items });
+        }
+        PendingKind::Rename => {
+            let edits = parse_workspace_edit(result);
+            if !edits.is_empty() {
+                let _ = tx_ev.send(LspEvent::RenameEdits { edits });
+            }
+        }
+        PendingKind::InlayHints(path) => {
+            let mut items = Vec::new();
+            if let Some(arr) = result.as_array() {
+                for h in arr.iter().take(200) {
+                    let line = h["position"]["line"].as_u64().unwrap_or(0) as usize;
+                    let col = h["position"]["character"].as_u64().unwrap_or(0) as usize;
+                    let label = if let Some(s) = h["label"].as_str() {
+                        s.to_string()
+                    } else if let Some(parts) = h["label"].as_array() {
+                        parts
+                            .iter()
+                            .filter_map(|p| p["value"].as_str())
+                            .collect::<String>()
+                    } else {
+                        String::new()
+                    };
+                    if !label.is_empty() {
+                        items.push(InlayHintItem { line, col, label });
+                    }
+                }
+            }
+            let _ = tx_ev.send(LspEvent::InlayHints { path, items });
+        }
+        PendingKind::SignatureHelp => {
+            let info = result
+                .get("signatures")
+                .and_then(|s| s.as_array())
+                .and_then(|arr| {
+                    let active_sig = result["activeSignature"].as_u64().unwrap_or(0) as usize;
+                    arr.get(active_sig).or_else(|| arr.first())
+                })
+                .and_then(|sig| {
+                    let label = sig["label"].as_str()?.to_string();
+                    let active_parameter = result["activeParameter"]
+                        .as_u64()
+                        .or_else(|| sig["activeParameter"].as_u64())
+                        .map(|n| n as usize);
+                    Some(SignatureHelpInfo {
+                        label,
+                        active_parameter,
+                    })
+                });
+            let _ = tx_ev.send(LspEvent::SignatureHelp { info });
+        }
     }
+}
+
+/// Parses an LSP `WorkspaceEdit` (`changes` or `documentChanges`) into path-grouped edits.
+pub fn parse_workspace_edit(val: &Value) -> HashMap<PathBuf, Vec<TextEditItem>> {
+    let mut out: HashMap<PathBuf, Vec<TextEditItem>> = HashMap::new();
+    if let Some(changes) = val.get("changes").and_then(|c| c.as_object()) {
+        for (uri_str, edits_val) in changes {
+            if let Ok(path) = Url::parse(uri_str)
+                .and_then(|u| u.to_file_path().map_err(|_| url::ParseError::EmptyHost))
+            {
+                if let Some(arr) = edits_val.as_array() {
+                    let parsed = parse_text_edits(arr);
+                    if !parsed.is_empty() {
+                        out.entry(path).or_default().extend(parsed);
+                    }
+                }
+            }
+        }
+    }
+    if let Some(doc_changes) = val.get("documentChanges").and_then(|c| c.as_array()) {
+        for dc in doc_changes {
+            if let Some(uri_str) = dc["textDocument"]["uri"].as_str() {
+                if let Ok(path) = Url::parse(uri_str)
+                    .and_then(|u| u.to_file_path().map_err(|_| url::ParseError::EmptyHost))
+                {
+                    if let Some(arr) = dc["edits"].as_array() {
+                        let parsed = parse_text_edits(arr);
+                        if !parsed.is_empty() {
+                            out.entry(path).or_default().extend(parsed);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    out
+}
+
+fn parse_text_edits(arr: &[Value]) -> Vec<TextEditItem> {
+    let mut out = Vec::new();
+    for e in arr {
+        let start = &e["range"]["start"];
+        let end = &e["range"]["end"];
+        let Some(new_text) = e["newText"].as_str() else {
+            continue;
+        };
+        out.push(TextEditItem {
+            start_line: start["line"].as_u64().unwrap_or(0) as usize,
+            start_col: start["character"].as_u64().unwrap_or(0) as usize,
+            end_line: end["line"].as_u64().unwrap_or(0) as usize,
+            end_col: end["character"].as_u64().unwrap_or(0) as usize,
+            new_text: new_text.to_string(),
+        });
+    }
+    out
 }

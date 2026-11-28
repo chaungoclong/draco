@@ -31,9 +31,18 @@ use crate::ui::settings_modal::{self, SettingsModalAction, SettingsModalState};
 use crate::ui::status_bar::{self, StatusAction, StatusInfo};
 use crate::ui::tabs::{self, TabAction, TabInfo};
 use crate::ui::terminal_panel::{self, TerminalUiAction};
+use crate::ui::workspace_search::{self, WorkspaceSearchAction, WorkspaceSearchUiState};
 use crate::workspace::file_tree::FileTree;
 use crate::workspace::fuzzy::WorkspaceIndexer;
+use crate::workspace::search::{replace_in_workspace, WorkspaceSearcher};
 use crate::workspace::watcher::{WatchEvent, WorkspaceWatcher};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+enum SidebarMode {
+    #[default]
+    Explorer,
+    Search,
+}
 
 struct OpenTab {
     doc: Document,
@@ -66,6 +75,9 @@ pub struct DracoApp {
     command_palette: CommandPaletteState,
     file_tree: Option<FileTree>,
     explorer_ui: ExplorerUiState,
+    sidebar_mode: SidebarMode,
+    workspace_search_ui: WorkspaceSearchUiState,
+    workspace_searcher: WorkspaceSearcher,
     indexer: WorkspaceIndexer,
     watcher: Option<WorkspaceWatcher>,
     last_tree_refresh: Instant,
@@ -75,6 +87,9 @@ pub struct DracoApp {
     show_sidebar: bool,
     show_terminal: bool,
     terminal_focused: bool,
+    split_tab: Option<usize>,
+    split_right_focused: bool,
+    split_view: CodeViewState,
     theme: Theme,
     quick_open: QuickOpenState,
     recent_files: Vec<PathBuf>,
@@ -107,6 +122,10 @@ impl DracoApp {
         let mut plugins = PluginManager::default_manager();
         plugins.reload(None, &settings);
 
+        let mut split_view = CodeViewState::default();
+        split_view.font_size = settings.font_size;
+        split_view.scroll_salt = 1;
+
         let mut app = Self {
             tabs: Vec::new(),
             active_tab: 0,
@@ -117,6 +136,9 @@ impl DracoApp {
             command_palette: CommandPaletteState::default(),
             file_tree: None,
             explorer_ui: ExplorerUiState::default(),
+            sidebar_mode: SidebarMode::Explorer,
+            workspace_search_ui: WorkspaceSearchUiState::default(),
+            workspace_searcher: WorkspaceSearcher::default(),
             indexer: WorkspaceIndexer::default(),
             watcher: None,
             last_tree_refresh: Instant::now(),
@@ -126,6 +148,9 @@ impl DracoApp {
             show_sidebar: true,
             show_terminal: false,
             terminal_focused: false,
+            split_tab: None,
+            split_right_focused: false,
+            split_view,
             theme,
             quick_open: QuickOpenState::default(),
             recent_files: Vec::new(),
@@ -365,8 +390,17 @@ impl DracoApp {
         self.tabs.remove(idx);
         if self.tabs.is_empty() {
             self.new_empty_tab();
-        } else if self.active_tab >= self.tabs.len() {
-            self.active_tab = self.tabs.len() - 1;
+            self.split_tab = None;
+            self.split_right_focused = false;
+        } else {
+            if self.active_tab >= self.tabs.len() {
+                self.active_tab = self.tabs.len() - 1;
+            }
+            if let Some(st) = self.split_tab {
+                if st >= self.tabs.len() {
+                    self.split_tab = Some(self.tabs.len() - 1);
+                }
+            }
         }
         self.recompute_search();
     }
@@ -379,12 +413,16 @@ impl DracoApp {
         self.tabs.clear();
         self.tabs.push(kept);
         self.active_tab = 0;
+        self.split_tab = None;
+        self.split_right_focused = false;
         self.recompute_search();
     }
 
     fn close_all_tabs(&mut self) {
         self.tabs.clear();
         self.new_empty_tab();
+        self.split_tab = None;
+        self.split_right_focused = false;
         self.recompute_search();
     }
 
@@ -759,6 +797,26 @@ impl DracoApp {
                 self.terminal_focused = false;
                 self.recompute_search();
             }
+            AppAction::OpenWorkspaceSearch => {
+                self.show_sidebar = true;
+                self.sidebar_mode = SidebarMode::Search;
+                self.workspace_search_ui.request_focus = true;
+                self.terminal_focused = false;
+            }
+            AppAction::ToggleSplitEditor => {
+                if self.split_tab.is_some() {
+                    self.split_tab = None;
+                    self.split_right_focused = false;
+                } else if !self.tabs.is_empty() {
+                    let right_idx = if self.tabs.len() > 1 {
+                        (self.active_tab + 1) % self.tabs.len()
+                    } else {
+                        self.active_tab
+                    };
+                    self.split_tab = Some(right_idx);
+                    self.split_right_focused = false;
+                }
+            }
             AppAction::ToggleMarkdownPreview => {
                 self.md_mode = self.md_mode.cycle();
                 self.status_message = Some(format!("Markdown view: {:?}", self.md_mode));
@@ -1024,10 +1082,12 @@ impl eframe::App for DracoApp {
                 .collect();
 
             let mut explorer_action = None;
+            let mut ws_search_action = None;
+            let has_workspace = self.file_tree.is_some();
             egui::SidePanel::left("draco_explorer")
                 .resizable(true)
-                .default_width(240.0)
-                .min_width(160.0)
+                .default_width(250.0)
+                .min_width(180.0)
                 .frame(
                     egui::Frame::NONE
                         .fill(self.theme.bg_panel)
@@ -1035,15 +1095,124 @@ impl eframe::App for DracoApp {
                         .inner_margin(egui::Margin::symmetric(8, 8)),
                 )
                 .show(ctx, |ui| {
-                    explorer_action = explorer::show_explorer(
-                        ui,
-                        &mut self.file_tree,
-                        &mut self.explorer_ui,
-                        active_path.as_ref(),
-                        &dirty_paths,
-                        &self.theme,
-                    );
+                    ui.horizontal(|ui| {
+                        ui.spacing_mut().item_spacing.x = 6.0;
+                        let exp_active = self.sidebar_mode == SidebarMode::Explorer;
+                        if ui
+                            .selectable_label(
+                                exp_active,
+                                egui::RichText::new("Explorer").size(11.5).color(if exp_active {
+                                    self.theme.accent
+                                } else {
+                                    self.theme.fg_muted
+                                }),
+                            )
+                            .clicked()
+                        {
+                            self.sidebar_mode = SidebarMode::Explorer;
+                        }
+                        let search_active = self.sidebar_mode == SidebarMode::Search;
+                        if ui
+                            .selectable_label(
+                                search_active,
+                                egui::RichText::new("Search").size(11.5).color(if search_active {
+                                    self.theme.accent
+                                } else {
+                                    self.theme.fg_muted
+                                }),
+                            )
+                            .on_hover_text("Search in Workspace (Ctrl+Shift+F)")
+                            .clicked()
+                        {
+                            self.sidebar_mode = SidebarMode::Search;
+                            self.workspace_search_ui.request_focus = true;
+                        }
+                    });
+                    ui.separator();
+
+                    match self.sidebar_mode {
+                        SidebarMode::Explorer => {
+                            explorer_action = explorer::show_explorer(
+                                ui,
+                                &mut self.file_tree,
+                                &mut self.explorer_ui,
+                                active_path.as_ref(),
+                                &dirty_paths,
+                                &self.theme,
+                            );
+                        }
+                        SidebarMode::Search => {
+                            let snap = self.workspace_searcher.snapshot();
+                            ws_search_action = workspace_search::show_workspace_search(
+                                ui,
+                                &mut self.workspace_search_ui,
+                                &snap,
+                                has_workspace,
+                                &self.theme,
+                            );
+                        }
+                    }
                 });
+
+            if let Some(ws_act) = ws_search_action {
+                match ws_act {
+                    WorkspaceSearchAction::RunSearch => {
+                        if let Some(root) = self.file_tree.as_ref().map(|t| t.root.clone()) {
+                            self.workspace_searcher.start_search(
+                                root,
+                                self.workspace_search_ui.query.clone(),
+                                self.workspace_search_ui.options.clone(),
+                                Arc::clone(&self.repaint),
+                            );
+                        }
+                    }
+                    WorkspaceSearchAction::ReplaceAll => {
+                        if let Some(root) = self.file_tree.as_ref().map(|t| t.root.clone()) {
+                            match replace_in_workspace(
+                                &root,
+                                &self.workspace_search_ui.query,
+                                &self.workspace_search_ui.replacement,
+                                &self.workspace_search_ui.options,
+                            ) {
+                                Ok(sum) => {
+                                    for p in &sum.modified_paths {
+                                        let canon = fs::canonicalize(p).unwrap_or_else(|_| p.clone());
+                                        for tab in &mut self.tabs {
+                                            if tab.doc.path.as_deref() == Some(canon.as_path())
+                                                && !tab.doc.dirty
+                                            {
+                                                let _ = tab.doc.reload_from_disk();
+                                                tab.syntax = SyntaxState::new(tab.doc.language);
+                                            }
+                                        }
+                                    }
+                                    self.status_message = Some(format!(
+                                        "Replaced {} occurrences across {} files",
+                                        sum.replacements, sum.files_changed
+                                    ));
+                                    self.workspace_searcher.start_search(
+                                        root,
+                                        self.workspace_search_ui.query.clone(),
+                                        self.workspace_search_ui.options.clone(),
+                                        Arc::clone(&self.repaint),
+                                    );
+                                }
+                                Err(e) => {
+                                    self.status_message =
+                                        Some(format!("Workspace replace error: {e}"));
+                                }
+                            }
+                        }
+                    }
+                    WorkspaceSearchAction::OpenMatch { path, line, col } => {
+                        self.open_file_path(path);
+                        if let Some(tab) = self.tabs.get_mut(self.active_tab) {
+                            tab.doc.set_cursor_at_line_col(line, col);
+                            tab.view.scroll_to_line = Some(line);
+                        }
+                    }
+                }
+            }
 
             if let Some(act) = explorer_action {
                 match act {
@@ -1347,7 +1516,208 @@ impl eframe::App for DracoApp {
                 let mut need_recompute_search = false;
                 let mut pending_ctx_action = None;
                 let mut pending_preview_action = None;
-                if let Some(tab) = self.tabs.get_mut(self.active_tab) {
+                let split_active_idx = if !is_markdown || self.md_mode == MarkdownViewMode::Editor {
+                    self.split_tab.filter(|&idx| idx < self.tabs.len())
+                } else {
+                    None
+                };
+
+                if let Some(right_idx) = split_active_idx {
+                    let left_idx = self.active_tab.min(self.tabs.len().saturating_sub(1));
+                    let avail = ui.available_size();
+                    let half_w = (avail.x * 0.5 - 3.0).max(180.0);
+                    let mut close_split = false;
+                    let mut next_right_idx = right_idx;
+                    let tab_count = self.tabs.len();
+                    let right_title = self
+                        .tabs
+                        .get(right_idx)
+                        .map(|t| t.doc.title())
+                        .unwrap_or_else(|| "Untitled".to_string());
+                    self.split_view.font_size = self.settings.font_size;
+
+                    ui.horizontal(|ui| {
+                        // Left Split Pane
+                        ui.allocate_ui_with_layout(
+                            egui::vec2(half_w, avail.y),
+                            egui::Layout::top_down(egui::Align::LEFT),
+                            |ui| {
+                                let pane_rect = ui.available_rect_before_wrap();
+                                if ui.input(|i| i.pointer.primary_clicked())
+                                    && ui.rect_contains_pointer(pane_rect)
+                                {
+                                    self.split_right_focused = false;
+                                    self.terminal_focused = false;
+                                    self.completion.close();
+                                }
+                                if !self.split_right_focused {
+                                    ui.painter().hline(
+                                        pane_rect.x_range(),
+                                        pane_rect.min.y + 1.0,
+                                        egui::Stroke::new(2.0_f32, self.theme.accent),
+                                    );
+                                }
+                                if let Some(tab) = self.tabs.get_mut(left_idx) {
+                                    let diags: Vec<DiagnosticItem> = tab
+                                        .doc
+                                        .path
+                                        .as_ref()
+                                        .and_then(|p| self.diagnostics.get(p))
+                                        .cloned()
+                                        .unwrap_or_default();
+                                    let out = code_view::show_code_view(
+                                        ui,
+                                        &mut tab.doc,
+                                        &mut tab.syntax,
+                                        &mut tab.view,
+                                        &self.theme,
+                                        &self.find_bar.matches,
+                                        &diags,
+                                        editor_has_focus && !self.split_right_focused,
+                                        &mut self.clipboard,
+                                    );
+                                    if !self.split_right_focused {
+                                        cursor_anchor = out.primary_cursor_screen_pos;
+                                        pending_ctx_action = out.context_action;
+                                    }
+                                    if out.text_changed {
+                                        tab.last_edit = Some(Instant::now());
+                                        if let Some(path) = tab.doc.path.clone() {
+                                            let text = tab.doc.rope.to_string();
+                                            self.lsp.did_change(
+                                                tab.doc.language,
+                                                &path,
+                                                tab.doc.version,
+                                                &text,
+                                            );
+                                        }
+                                        if self.find_bar.open {
+                                            need_recompute_search = true;
+                                        }
+                                    }
+                                }
+                            },
+                        );
+
+                        ui.separator();
+
+                        // Right Split Pane
+                        ui.allocate_ui_with_layout(
+                            egui::vec2(half_w, avail.y),
+                            egui::Layout::top_down(egui::Align::LEFT),
+                            |ui| {
+                                let pane_rect = ui.available_rect_before_wrap();
+                                if ui.input(|i| i.pointer.primary_clicked())
+                                    && ui.rect_contains_pointer(pane_rect)
+                                {
+                                    self.split_right_focused = true;
+                                    self.terminal_focused = false;
+                                    self.completion.close();
+                                }
+                                if self.split_right_focused {
+                                    ui.painter().hline(
+                                        pane_rect.x_range(),
+                                        pane_rect.min.y + 1.0,
+                                        egui::Stroke::new(2.0_f32, self.theme.accent),
+                                    );
+                                }
+                                egui::Frame::NONE
+                                    .fill(self.theme.bg_tab_bar)
+                                    .inner_margin(egui::Margin::symmetric(8, 2))
+                                    .show(ui, |ui| {
+                                        ui.horizontal(|ui| {
+                                            ui.label(
+                                                egui::RichText::new(&right_title)
+                                                    .size(11.5)
+                                                    .strong()
+                                                    .color(if self.split_right_focused {
+                                                        self.theme.accent
+                                                    } else {
+                                                        self.theme.fg_muted
+                                                    }),
+                                            );
+                                            ui.with_layout(
+                                                egui::Layout::right_to_left(egui::Align::Center),
+                                                |ui| {
+                                                    if ui
+                                                        .add(
+                                                            egui::Button::new(
+                                                                egui::RichText::new("×")
+                                                                    .size(13.0)
+                                                                    .color(self.theme.fg_muted),
+                                                            )
+                                                            .frame(false),
+                                                        )
+                                                        .on_hover_text("Close Split (Ctrl+\\)")
+                                                        .clicked()
+                                                    {
+                                                        close_split = true;
+                                                    }
+                                                    if tab_count > 1 {
+                                                        if ui.small_button("›").clicked() {
+                                                            next_right_idx =
+                                                                (right_idx + 1) % tab_count;
+                                                        }
+                                                        if ui.small_button("‹").clicked() {
+                                                            next_right_idx = if right_idx == 0 {
+                                                                tab_count - 1
+                                                            } else {
+                                                                right_idx - 1
+                                                            };
+                                                        }
+                                                    }
+                                                },
+                                            );
+                                        });
+                                    });
+
+                                if let Some(tab) = self.tabs.get_mut(right_idx) {
+                                    let diags: Vec<DiagnosticItem> = tab
+                                        .doc
+                                        .path
+                                        .as_ref()
+                                        .and_then(|p| self.diagnostics.get(p))
+                                        .cloned()
+                                        .unwrap_or_default();
+                                    let out = code_view::show_code_view(
+                                        ui,
+                                        &mut tab.doc,
+                                        &mut tab.syntax,
+                                        &mut self.split_view,
+                                        &self.theme,
+                                        &[],
+                                        &diags,
+                                        editor_has_focus && self.split_right_focused,
+                                        &mut self.clipboard,
+                                    );
+                                    if self.split_right_focused {
+                                        cursor_anchor = out.primary_cursor_screen_pos;
+                                        pending_ctx_action = out.context_action;
+                                    }
+                                    if out.text_changed {
+                                        tab.last_edit = Some(Instant::now());
+                                        if let Some(path) = tab.doc.path.clone() {
+                                            let text = tab.doc.rope.to_string();
+                                            self.lsp.did_change(
+                                                tab.doc.language,
+                                                &path,
+                                                tab.doc.version,
+                                                &text,
+                                            );
+                                        }
+                                    }
+                                }
+                            },
+                        );
+                    });
+
+                    if close_split {
+                        self.split_tab = None;
+                        self.split_right_focused = false;
+                    } else if next_right_idx != right_idx {
+                        self.split_tab = Some(next_right_idx);
+                    }
+                } else if let Some(tab) = self.tabs.get_mut(self.active_tab) {
                     let diags: Vec<DiagnosticItem> = tab
                         .doc
                         .path

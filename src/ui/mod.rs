@@ -12,3 +12,4 @@ pub mod settings_modal;
 pub mod status_bar;
 pub mod tabs;
 pub mod terminal_panel;
+pub mod workspace_search;

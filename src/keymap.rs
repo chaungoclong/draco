@@ -21,6 +21,8 @@ pub enum AppAction {
     OpenSettings,
     OpenFind,
     OpenReplace,
+    OpenWorkspaceSearch,
+    ToggleSplitEditor,
     ToggleMarkdownPreview,
     GoToDefinition,
     TriggerCompletion,
@@ -65,8 +67,14 @@ pub fn poll_global_action(ctx: &egui::Context) -> Option<AppAction> {
         if i.consume_key(Modifiers::COMMAND, Key::Comma) {
             return Some(AppAction::OpenSettings);
         }
+        if i.consume_key(Modifiers::COMMAND | Modifiers::SHIFT, Key::F) {
+            return Some(AppAction::OpenWorkspaceSearch);
+        }
         if i.consume_key(Modifiers::COMMAND, Key::F) {
             return Some(AppAction::OpenFind);
+        }
+        if i.consume_key(Modifiers::COMMAND, Key::Backslash) {
+            return Some(AppAction::ToggleSplitEditor);
         }
         if i.consume_key(Modifiers::COMMAND, Key::H) {
             return Some(AppAction::OpenReplace);

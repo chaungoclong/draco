@@ -20,7 +20,8 @@ Draco sử dụng bộ phím tắt chuẩn hiện đại (VS Code / Sublime). Tr
 | `Ctrl+R` | Mở Go to Symbol (nhảy nhanh tới hàm, struct, class, heading trong file hiện tại) |
 | `Ctrl+Shift+P` | Mở Command Palette (chạy lệnh & plugin) |
 | `Ctrl+,` | Mở Settings & Plugin Manager |
-| `Ctrl+B` | Ẩn/hiện File Explorer |
+| `Ctrl+B` | Ẩn/hiện Sidebar (File Explorer / Search in Files) |
+| `Ctrl+\` | Bật/tắt Split Editor (chia 2 pane song song) |
 | ``Ctrl+` `` | Bật/tắt Terminal nội bộ |
 | ``Ctrl+Shift+` `` | Tạo tab Terminal mới |
 | `Ctrl+Shift+T` | Đổi Dark / Light theme |
@@ -45,7 +46,8 @@ Draco sử dụng bộ phím tắt chuẩn hiện đại (VS Code / Sublime). Tr
 ## Tìm kiếm & LSP
 | Phím tắt | Chức năng |
 |---|---|
-| `Ctrl+F` / `Ctrl+H` | Mở Find / Find & Replace |
+| `Ctrl+F` / `Ctrl+H` | Mở Find / Find & Replace trong file hiện tại |
+| `Ctrl+Shift+F` | Mở Find & Replace toàn Workspace (tôn trọng `.gitignore`) |
 | `Ctrl+Space` | Gọi gợi ý LSP Autocomplete |
 | `F12` hoặc `Ctrl+Click` | Go to Definition |
 

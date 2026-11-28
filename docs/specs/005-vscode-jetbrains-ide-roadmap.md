@@ -1,6 +1,6 @@
 # Spec 005 — Lộ trình IDE (Chọn lọc tinh hoa VS Code + JetBrains) & Đợt 1
 
-- **Trạng thái**: In Progress (Đợt 1 Implemented)
+- **Trạng thái**: In Progress (Đợt 1 & Đợt 2 Implemented)
 - **Ngày tạo**: 2026-11-28
 
 ## 1. Bối cảnh & Triết lý sản phẩm
@@ -29,10 +29,10 @@
    - Theo dõi danh sách file vừa truy cập theo thứ tự MRU (Most Recently Used).
    - Hợp nhất điều hướng vào một modal gọn duy nhất có tab chuyển nhanh bằng `Tab` hoặc click (`Files` — `Ctrl+P`, `Recent` — `Ctrl+E`, `Symbols` — `Ctrl+R`).
 
-### Đợt 2 — Tìm kiếm toàn Workspace & Split Editor (Kế hoạch)
-- **Workspace Find & Replace (`Ctrl+Shift+F`)** đa luồng dựa trên `ignore` + `regex`, có bộ lọc include/exclude.
-- **Split Editor (`Ctrl+\`)** chia 2 pane song song cho mọi file code.
-- **Overview Ruler** trên thanh cuộn `CodeView` (chấm màu lỗi LSP, cảnh báo và vị trí kết quả Find).
+### Đợt 2 — Tìm kiếm toàn Workspace & Split Editor ✅
+- **Workspace Find & Replace (`Ctrl+Shift+F`, `src/workspace/search.rs`, `src/ui/workspace_search.rs`)**: tìm kiếm đa luồng trên nền (`std::thread` + `ignore` tôn trọng `.gitignore` + `regex`), bộ lọc Include/Exclude, nhóm kết quả theo file, click nhảy thẳng tới `(line, col)` và Replace All toàn workspace (tự reload các tab đang mở).
+- **Split Editor (`Ctrl+\`)**: chia 2 pane song song cho mọi file code (kể cả xem 2 vị trí khác nhau của cùng 1 file với `scroll_salt` độc lập), có thanh chuyển tab cho pane phải và viền nhấn nhận biết pane đang focus.
+- **Overview Ruler trong `CodeView`**: thanh dọc 10px bên mép phải hiển thị chấm lỗi LSP (đỏ), cảnh báo (vàng), kết quả Find (accent) và vị trí con trỏ chính; click/kéo để nhảy nhanh tới bất kỳ dòng nào.
 
 ### Đợt 3 — Nâng cấp LSP lên tầm IDE & Git Inline (Kế hoạch)
 - **Quick-Fix / Code Actions (`Alt+Enter`)** & **Rename Symbol (`F2`)**.

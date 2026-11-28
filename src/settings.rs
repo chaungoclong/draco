@@ -40,6 +40,8 @@ pub struct Settings {
     pub show_indent_guides: bool,
     pub terminal_layout: TerminalLayout,
     pub disabled_plugins: Vec<String>,
+    pub last_workspace: Option<PathBuf>,
+    pub recent_workspaces: Vec<PathBuf>,
 }
 
 impl Default for Settings {
@@ -53,6 +55,8 @@ impl Default for Settings {
             show_indent_guides: true,
             terminal_layout: TerminalLayout::Bottom,
             disabled_plugins: Vec::new(),
+            last_workspace: None,
+            recent_workspaces: Vec::new(),
         }
     }
 }
@@ -107,6 +111,29 @@ impl Settings {
         } else if !self.disabled_plugins.iter().any(|id| id == plugin_id) {
             self.disabled_plugins.push(plugin_id.to_string());
         }
+    }
+
+    /// Records a workspace folder as the active `last_workspace` and pushes it to the top of `recent_workspaces` (MRU, max 10).
+    pub fn record_recent_workspace(&mut self, path: PathBuf) {
+        self.last_workspace = Some(path.clone());
+        self.recent_workspaces.retain(|p| p != &path);
+        self.recent_workspaces.insert(0, path);
+        if self.recent_workspaces.len() > 10 {
+            self.recent_workspaces.truncate(10);
+        }
+    }
+
+    /// Removes a workspace folder from `recent_workspaces` (and clears `last_workspace` if it matches).
+    pub fn remove_recent_workspace(&mut self, path: &Path) {
+        self.recent_workspaces.retain(|p| p.as_path() != path);
+        if self.last_workspace.as_deref() == Some(path) {
+            self.last_workspace = self.recent_workspaces.first().cloned();
+        }
+    }
+
+    /// Returns `last_workspace` only if it still exists on disk as a directory.
+    pub fn valid_last_workspace(&self) -> Option<PathBuf> {
+        self.last_workspace.clone().filter(|p| p.is_dir())
     }
 }
 

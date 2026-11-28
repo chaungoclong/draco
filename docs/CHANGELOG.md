@@ -63,6 +63,10 @@ Tất cả thay đổi đáng chú ý của **Draco** đều được ghi nhận
 - Quy tắc bảo trì tài liệu trong `AGENTS.md` cho các thay đổi tương lai.
 
 ### Fixed
+- **Khởi động tức thì chuẩn VS Code / PhpStorm (không tự mở `/home/<user>`)**:
+  - Khi mở Draco không kèm tham số đường dẫn CLI (ví dụ từ menu ứng dụng), bỏ hành vi mặc định mở `current_dir()` (`/home/<user>`) gây chậm ~2 giây.
+  - Lần đầu khởi động (chưa có project trước đó): mở tức thì vào **Welcome Screen** (nút `Open Folder`, `Open File`, `New File` và danh sách **Recent Projects**).
+  - Các lần mở sau: tự động khôi phục project mở gần nhất (`last_workspace` + `recent_workspaces` lưu trong `settings.json`).
 - Sửa lỗi còn lưu file/tab và kết quả tìm kiếm của thư mục cũ khi mở thư mục workspace mới (`Ctrl+Shift+O`): tự động đóng các tab cũ, reset Split Editor, xóa `recent_files`, Quick Open index (kèm generation counter chống luồng nền cũ ghi đè), kết quả Workspace Search, Find Bar, LSP cache, Git diff cache và Markdown preview cache.
 - Sửa lỗi mất chữ bên trong sơ đồ Mermaid trên Linux bằng cách ánh xạ rõ `set_sans_serif_family` / `set_monospace_family` và `opts.font_family` cho `resvg`.
 - Sửa lỗi giật/kéo ngược khi cuộn 2 chiều & nhấn Outline bằng quy tắc Master/Follower theo con trỏ chuột và nhảy trực tiếp tới `heading_y_positions`.

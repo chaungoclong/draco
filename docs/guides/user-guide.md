@@ -48,7 +48,9 @@ draco /duong/dan/toi/du-an
 draco src/main.rs docs/README.md
 ```
 
-Hoặc sau khi đã mở cửa sổ Draco:
+Hoặc sau khi đã mở cửa sổ Draco từ menu ứng dụng:
+- **Lần mở đầu tiên**: Draco khởi động tức thì vào **Welcome Screen** (không quét nhầm thư mục `/home`) với các nút **Open Folder**, **Open File**, **New File** và danh sách **Recent Projects**.
+- **Các lần mở tiếp theo**: Draco tự động mở lại **dự án gần nhất** bạn đã làm việc (giống VS Code / PhpStorm).
 - **Mở thư mục (Workspace)**: nhấn `Ctrl+Shift+O` (hoặc bấm nút mở thư mục trong File Explorer). Khi chuyển sang thư mục mới, Draco tự động đóng các tab và dọn sạch lịch sử/kết quả tìm kiếm của thư mục cũ.
 - **Mở 1 file lẻ**: nhấn `Ctrl+O`.
 - **Tạo file mới**: nhấn `Ctrl+N`.

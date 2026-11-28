@@ -94,6 +94,7 @@ pub struct DracoApp {
     git_diff: GitDiffTracker,
     terminal: TerminalManager,
     show_sidebar: bool,
+    show_welcome: bool,
     show_terminal: bool,
     terminal_focused: bool,
     split_tab: Option<usize>,
@@ -160,6 +161,7 @@ impl DracoApp {
             git_diff: GitDiffTracker::default(),
             terminal: TerminalManager::new(terminal_layout),
             show_sidebar: true,
+            show_welcome: false,
             show_terminal: false,
             terminal_focused: false,
             split_tab: None,
@@ -177,6 +179,7 @@ impl DracoApp {
             repaint,
         };
 
+        let has_cli_paths = !initial_paths.is_empty();
         for p in initial_paths {
             let abs = fs::canonicalize(&p).unwrap_or(p);
             if abs.is_dir() {
@@ -191,14 +194,21 @@ impl DracoApp {
             }
         }
 
-        if app.file_tree.is_none() {
-            if let Ok(cwd) = std::env::current_dir() {
-                app.open_workspace_folder(cwd);
+        if !has_cli_paths && app.file_tree.is_none() {
+            if let Some(last_ws) = app.settings.valid_last_workspace() {
+                // VS Code / PhpStorm behavior: restore the last opened project automatically
+                app.open_workspace_folder(last_ws);
+            } else {
+                // First launch (no previous project): NEVER scan $HOME/current_dir; start instantly on Welcome screen
+                app.show_sidebar = false;
+                app.show_welcome = true;
             }
         }
 
         if app.tabs.is_empty() {
+            let was_welcome = app.show_welcome;
             app.new_empty_tab();
+            app.show_welcome = was_welcome;
         }
 
         app
@@ -227,6 +237,7 @@ impl DracoApp {
         ));
         self.active_tab = self.tabs.len() - 1;
         self.terminal_focused = false;
+        self.show_welcome = false;
     }
 
     fn open_workspace_folder(&mut self, root: PathBuf) {
@@ -262,6 +273,10 @@ impl DracoApp {
         self.plugins.reload(Some(&root), &self.settings);
         self.watcher = WorkspaceWatcher::watch(&root, Arc::clone(&self.repaint)).ok();
         self.file_tree = Some(FileTree::open(root.clone()));
+        self.show_welcome = false;
+        self.show_sidebar = true;
+        self.settings.record_recent_workspace(root.clone());
+        let _ = self.settings.save_default();
         self.status_message = Some(format!("Workspace opened: {}", root.display()));
     }
 
@@ -320,6 +335,7 @@ impl DracoApp {
     }
 
     fn open_file_path(&mut self, path: PathBuf) {
+        self.show_welcome = false;
         let canonical = fs::canonicalize(&path).unwrap_or(path);
         self.record_recent_file(&canonical);
         if let Some(existing) = self
@@ -1545,6 +1561,161 @@ impl eframe::App for DracoApp {
                                 &self.theme,
                             );
                         });
+                    return;
+                }
+
+                if self.show_welcome {
+                    let mut open_folder_clicked = false;
+                    let mut open_file_clicked = false;
+                    let mut new_file_clicked = false;
+                    let mut open_recent_ws: Option<PathBuf> = None;
+                    let mut remove_recent_ws: Option<PathBuf> = None;
+
+                    ui.vertical_centered(|ui| {
+                        ui.add_space((ui.available_height() * 0.16).max(28.0));
+                        ui.label(
+                            egui::RichText::new("Draco")
+                                .size(34.0)
+                                .strong()
+                                .color(self.theme.accent),
+                        );
+                        ui.add_space(4.0);
+                        ui.label(
+                            egui::RichText::new("Lightweight, GPU-accelerated Rust Code Editor")
+                                .size(13.5)
+                                .color(self.theme.fg_muted),
+                        );
+                        ui.add_space(24.0);
+
+                        egui::Frame::NONE
+                            .fill(self.theme.bg_panel)
+                            .stroke(egui::Stroke::new(1.0_f32, self.theme.border))
+                            .corner_radius(10.0)
+                            .inner_margin(egui::Margin::symmetric(24, 20))
+                            .show(ui, |ui| {
+                                ui.set_width(440.0);
+                                ui.with_layout(egui::Layout::top_down(egui::Align::LEFT), |ui| {
+                                    ui.label(
+                                        egui::RichText::new("Start")
+                                            .size(12.0)
+                                            .strong()
+                                            .color(self.theme.fg_muted),
+                                    );
+                                    ui.add_space(8.0);
+                                    ui.horizontal(|ui| {
+                                        ui.spacing_mut().item_spacing.x = 10.0;
+                                        if ui
+                                            .add(
+                                                egui::Button::new(
+                                                    egui::RichText::new("Open Folder… (Ctrl+Shift+O)")
+                                                        .size(13.0)
+                                                        .color(self.theme.accent),
+                                                )
+                                                .fill(self.theme.bg_popup_selected),
+                                            )
+                                            .clicked()
+                                        {
+                                            open_folder_clicked = true;
+                                        }
+                                        if ui
+                                            .button(
+                                                egui::RichText::new("Open File… (Ctrl+O)").size(13.0),
+                                            )
+                                            .clicked()
+                                        {
+                                            open_file_clicked = true;
+                                        }
+                                        if ui
+                                            .button(
+                                                egui::RichText::new("New File (Ctrl+N)").size(13.0),
+                                            )
+                                            .clicked()
+                                        {
+                                            new_file_clicked = true;
+                                        }
+                                    });
+
+                                    if !self.settings.recent_workspaces.is_empty() {
+                                        ui.add_space(18.0);
+                                        ui.separator();
+                                        ui.add_space(10.0);
+                                        ui.label(
+                                            egui::RichText::new("Recent Projects")
+                                                .size(12.0)
+                                                .strong()
+                                                .color(self.theme.fg_muted),
+                                        );
+                                        ui.add_space(6.0);
+                                        for ws in &self.settings.recent_workspaces {
+                                            let name = ws
+                                                .file_name()
+                                                .and_then(|n| n.to_str())
+                                                .unwrap_or("Project");
+                                            ui.horizontal(|ui| {
+                                                if ui
+                                                    .add(
+                                                        egui::Button::new(
+                                                            egui::RichText::new(name)
+                                                                .size(13.0)
+                                                                .strong()
+                                                                .color(self.theme.accent),
+                                                        )
+                                                        .frame(false),
+                                                    )
+                                                    .clicked()
+                                                {
+                                                    open_recent_ws = Some(ws.clone());
+                                                }
+                                                ui.label(
+                                                    egui::RichText::new(ws.display().to_string())
+                                                        .size(11.5)
+                                                        .color(self.theme.fg_muted),
+                                                );
+                                                ui.with_layout(
+                                                    egui::Layout::right_to_left(egui::Align::Center),
+                                                    |ui| {
+                                                        if ui
+                                                            .add(
+                                                                egui::Button::new(
+                                                                    egui::RichText::new("×")
+                                                                        .size(12.0)
+                                                                        .color(self.theme.fg_muted),
+                                                                )
+                                                                .frame(false),
+                                                            )
+                                                            .on_hover_text("Remove from Recent Projects")
+                                                            .clicked()
+                                                        {
+                                                            remove_recent_ws = Some(ws.clone());
+                                                        }
+                                                    },
+                                                );
+                                            });
+                                        }
+                                    }
+                                });
+                            });
+                    });
+
+                    if open_folder_clicked {
+                        self.handle_global_action(ctx, AppAction::OpenFolder);
+                    } else if open_file_clicked {
+                        self.handle_global_action(ctx, AppAction::OpenFile);
+                    } else if new_file_clicked {
+                        self.show_welcome = false;
+                    } else if let Some(ws) = open_recent_ws {
+                        if ws.is_dir() {
+                            self.open_workspace_folder(ws);
+                        } else {
+                            self.settings.remove_recent_workspace(&ws);
+                            let _ = self.settings.save_default();
+                            self.status_message =
+                                Some(format!("Folder no longer exists: {}", ws.display()));
+                        }
+                    } else if let Some(ws) = remove_recent_ws {
+                        self.settings.remove_recent_workspace(&ws);
+                        let _ = self.settings.save_default();
+                    }
                     return;
                 }
 

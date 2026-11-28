@@ -5,6 +5,10 @@ Tất cả thay đổi đáng chú ý của **Draco** đều được ghi nhận
 ## [Unreleased]
 
 ### Added
+- **Phase 2 IDE Ergonomics — Workspace Search, Split Editor & Overview Ruler ([Spec 005](./specs/005-vscode-jetbrains-ide-roadmap.md))**:
+  - **Workspace Find & Replace (`Ctrl+Shift+F`, `src/workspace/search.rs`, `src/ui/workspace_search.rs`)**: tìm kiếm toàn workspace trên luồng nền (`ignore` + `regex`, tôn trọng `.gitignore`, lọc Include/Exclude, click nhảy tới dòng/cột, Replace All kèm tự reload tab đang mở).
+  - **Split Editor (`Ctrl+\`)**: chia 2 pane song song cho mọi file code với cuộn độc lập, thanh chuyển tab nhanh trên pane phải và viền accent nhận biết pane đang focus.
+  - **Overview Ruler trong `CodeView`**: thanh 10px mép phải hiển thị chấm lỗi/cảnh báo LSP, kết quả Find và vị trí con trỏ; bấm hoặc kéo để nhảy nhanh tới dòng tương ứng.
 - **Phase 1 IDE Ergonomics — Chọn lọc VS Code + JetBrains ([Spec 005](./specs/005-vscode-jetbrains-ide-roadmap.md))**:
   - **AST Extend / Shrink Selection (`Shift+Alt+Right` / `Shift+Alt+Left`, `src/syntax/ast.rs`)**: mở rộng và thu gọn vùng chọn theo từng cấp cây cú pháp Tree-sitter (an toàn UTF-8).
   - **Code Outline / Go to Symbol (`Ctrl+R`, `src/syntax/symbols.rs`)**: trích xuất symbol từ Tree-sitter cho Rust, Python, JS/TS, PHP, C/C++, TOML, JSON, Markdown và nhảy thẳng tới dòng định nghĩa qua fuzzy search.

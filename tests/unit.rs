@@ -28,3 +28,5 @@ mod syntax_tests;
 mod terminal_grid_tests;
 #[path = "unit/workspace_tests.rs"]
 mod workspace_tests;
+#[path = "unit/workspace_search_tests.rs"]
+mod workspace_search_tests;

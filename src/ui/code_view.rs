@@ -36,6 +36,7 @@ pub struct CodeViewState {
     pub ensure_cursor_visible: bool,
     pub scroll_to_line: Option<usize>,
     pub scroll_to_top_line: Option<f32>,
+    pub scroll_salt: u64,
     dragging: bool,
     pub ast_selection: AstSelectionHistory,
     last_top_visible_line: usize,
@@ -48,11 +49,21 @@ impl Default for CodeViewState {
             ensure_cursor_visible: false,
             scroll_to_line: None,
             scroll_to_top_line: None,
+            scroll_salt: 0,
             dragging: false,
             ast_selection: AstSelectionHistory::default(),
             last_top_visible_line: 0,
         }
     }
+}
+
+/// Maps a 0-indexed document line into an Overview Ruler Y coordinate.
+pub fn overview_marker_y(line: usize, total_lines: usize, ruler_top: f32, ruler_height: f32) -> f32 {
+    if total_lines <= 1 || ruler_height <= 0.0 {
+        return ruler_top;
+    }
+    let ratio = (line.min(total_lines - 1) as f32) / ((total_lines - 1) as f32);
+    ruler_top + ratio * (ruler_height - 3.0).max(0.0)
 }
 
 fn visual_col_width(line_str: &str, char_col: usize) -> usize {
@@ -187,20 +198,23 @@ pub fn show_code_view(
         }
     }
 
-    // Compute virtual canvas size
-    let virtual_height = (total_lines as f32 * line_height + ui.available_height() * 0.5)
-        .max(ui.available_height());
-    let virtual_width = (ui.available_width()).max(gutter_width + text_left_pad + 160.0 * char_width);
+    // Compute virtual canvas size (reserve 10px on right for Overview Ruler)
+    let ruler_width = if ui.available_width() > 140.0 { 10.0 } else { 0.0 };
+    let editor_avail_w = (ui.available_width() - ruler_width).max(60.0);
+    let editor_avail_h = ui.available_height().max(40.0);
+    let virtual_height = (total_lines as f32 * line_height + editor_avail_h * 0.5)
+        .max(editor_avail_h);
+    let virtual_width = editor_avail_w.max(gutter_width + text_left_pad + 160.0 * char_width);
 
     let mut scroll_area = egui::ScrollArea::both()
-        .id_salt(("draco_code_scroll", doc.id))
+        .id_salt(("draco_code_scroll", doc.id, state.scroll_salt))
         .auto_shrink([false, false]);
 
     if let Some(top_line) = state.scroll_to_top_line.take() {
         let target_y = (top_line * line_height).max(0.0);
         scroll_area = scroll_area.vertical_scroll_offset(target_y);
     } else if let Some(target_line) = state.scroll_to_line.take() {
-        let target_y = (target_line as f32 * line_height - ui.available_height() * 0.3).max(0.0);
+        let target_y = (target_line as f32 * line_height - editor_avail_h * 0.3).max(0.0);
         scroll_area = scroll_area.vertical_scroll_offset(target_y);
     }
 
@@ -210,7 +224,13 @@ pub fn show_code_view(
             bar_width: 8.0,
             ..egui::style::ScrollStyle::solid()
         };
-        scroll_area.show_viewport(ui, |ui, viewport| {
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 0.0;
+            ui.allocate_ui_with_layout(
+                Vec2::new(editor_avail_w, editor_avail_h),
+                egui::Layout::top_down(egui::Align::LEFT),
+                |ui| {
+                    scroll_area.show_viewport(ui, |ui, viewport| {
             let (rect, response) = ui.allocate_exact_size(
                 Vec2::new(virtual_width, virtual_height),
                 Sense::click_and_drag(),
@@ -576,6 +596,76 @@ pub fn show_code_view(
                                 ui.label(&diag.message);
                             },
                         );
+                    }
+                }
+            }
+                    });
+                },
+            );
+
+            // 10. Overview Ruler (diagnostics, find matches, primary cursor; click to jump)
+            if ruler_width > 0.0 {
+                let (ruler_rect, ruler_resp) = ui.allocate_exact_size(
+                    Vec2::new(ruler_width, editor_avail_h),
+                    Sense::click_and_drag(),
+                );
+                let rp = ui.painter_at(ruler_rect);
+                rp.rect_filled(ruler_rect, 0.0, theme.bg_panel);
+                rp.line_segment(
+                    [ruler_rect.left_top(), ruler_rect.left_bottom()],
+                    Stroke::new(1.0_f32, theme.border),
+                );
+
+                // Search match ticks (sampled to at most 400 for O(1) perf on huge files)
+                if !search_matches.is_empty() {
+                    let step = (search_matches.len() / 400).max(1);
+                    let match_color = theme.accent.linear_multiply(0.85);
+                    for m in search_matches.iter().step_by(step) {
+                        let line = doc.rope.char_to_line(m.start.min(doc.len_chars()));
+                        let y = overview_marker_y(line, total_lines, ruler_rect.min.y, ruler_rect.height());
+                        rp.rect_filled(
+                            Rect::from_min_size(Pos2::new(ruler_rect.min.x + 2.0, y), Vec2::new(ruler_width - 3.0, 2.0)),
+                            0.5,
+                            match_color,
+                        );
+                    }
+                }
+
+                // LSP diagnostic ticks (warnings then errors on top)
+                for diag in diagnostics.iter().filter(|d| d.severity != 1) {
+                    let y = overview_marker_y(diag.start_line, total_lines, ruler_rect.min.y, ruler_rect.height());
+                    rp.rect_filled(
+                        Rect::from_min_size(Pos2::new(ruler_rect.min.x + 1.5, y), Vec2::new(ruler_width - 2.5, 3.0)),
+                        0.5,
+                        theme.diag_warning,
+                    );
+                }
+                for diag in diagnostics.iter().filter(|d| d.severity == 1) {
+                    let y = overview_marker_y(diag.start_line, total_lines, ruler_rect.min.y, ruler_rect.height());
+                    rp.rect_filled(
+                        Rect::from_min_size(Pos2::new(ruler_rect.min.x + 1.5, y), Vec2::new(ruler_width - 2.5, 3.0)),
+                        0.5,
+                        theme.diag_error,
+                    );
+                }
+
+                // Primary cursor tick
+                let cur_line = doc.rope.char_to_line(doc.selections.primary().head.min(doc.len_chars()));
+                let cur_y = overview_marker_y(cur_line, total_lines, ruler_rect.min.y, ruler_rect.height());
+                rp.rect_filled(
+                    Rect::from_min_size(Pos2::new(ruler_rect.min.x + 1.0, cur_y), Vec2::new(ruler_width - 2.0, 2.0)),
+                    0.5,
+                    theme.fg_text,
+                );
+
+                if ruler_resp.hovered() {
+                    ui.ctx().set_cursor_icon(CursorIcon::PointingHand);
+                }
+                if (ruler_resp.clicked() || ruler_resp.dragged()) && ruler_rect.height() > 1.0 {
+                    if let Some(pos) = ruler_resp.interact_pointer_pos() {
+                        let ratio = ((pos.y - ruler_rect.min.y) / ruler_rect.height()).clamp(0.0, 1.0);
+                        let target = (ratio * (total_lines.saturating_sub(1)) as f32).round() as usize;
+                        state.scroll_to_line = Some(target);
                     }
                 }
             }

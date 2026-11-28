@@ -5,15 +5,16 @@ Tất cả thay đổi đáng chú ý của **Draco** đều được ghi nhận
 ## [Unreleased]
 
 ### Added
-- **Phase 3 IDE Ergonomics — LSP Quick-Fix, Rename, Inlay Hints, Signature Help & Git Gutter ([Spec 005](./specs/005-vscode-jetbrains-ide-roadmap.md))**:
+- **Hướng dẫn sử dụng cho người dùng cuối (`docs/guides/user-guide.md`)**: tài liệu tutorial chi tiết từng bước cho toàn bộ tính năng Draco (từ cơ bản đến Phase 1–3, Markdown/Mermaid, Terminal, Git Gutter, LSP, Settings & Plugins) kèm quy tắc tự đồng bộ trong `AGENTS.md`.
+- **Phase 3 IDE Ergonomics — LSP Quick-Fix, Rename, Inlay Hints, Signature Help & Git Gutter ([Spec 007](./specs/007-lsp-ide-actions-and-git-gutter.md))**:
   - **Quick-Fix / Code Actions (`Alt+Enter`) & Rename Symbol (`F2`)** (`src/lsp/client.rs`, `src/ui/lsp_popups.rs`): hỗ trợ `textDocument/codeAction`, `textDocument/rename`, parse `WorkspaceEdit` (`changes`/`documentChanges`) và áp dụng an toàn UTF-8 theo thứ tự offset ngược.
   - **Inlay Hints & Signature Help**: hiển thị gợi ý kiểu/tham số dạng pill mờ trong `CodeView` và tooltip chữ ký hàm phía trên con trỏ khi gõ `(` hoặc `,`.
   - **Git Gutter Indicators (`src/workspace/git_diff.rs`)**: tính diff `git diff -U0` trên luồng nền và vẽ vạch màu Added (xanh lá), Modified (xanh dương), Deleted (đỏ) ngay cạnh số dòng.
-- **Phase 2 IDE Ergonomics — Workspace Search, Split Editor & Overview Ruler ([Spec 005](./specs/005-vscode-jetbrains-ide-roadmap.md))**:
+- **Phase 2 IDE Ergonomics — Workspace Search, Split Editor & Overview Ruler ([Spec 006](./specs/006-workspace-search-split-editor-overview-ruler.md))**:
   - **Workspace Find & Replace (`Ctrl+Shift+F`, `src/workspace/search.rs`, `src/ui/workspace_search.rs`)**: tìm kiếm toàn workspace trên luồng nền (`ignore` + `regex`, tôn trọng `.gitignore`, lọc Include/Exclude, click nhảy tới dòng/cột, Replace All kèm tự reload tab đang mở).
   - **Split Editor (`Ctrl+\`)**: chia 2 pane song song cho mọi file code với cuộn độc lập, thanh chuyển tab nhanh trên pane phải và viền accent nhận biết pane đang focus.
   - **Overview Ruler trong `CodeView`**: thanh 10px mép phải hiển thị chấm lỗi/cảnh báo LSP, kết quả Find và vị trí con trỏ; bấm hoặc kéo để nhảy nhanh tới dòng tương ứng.
-- **Phase 1 IDE Ergonomics — Chọn lọc VS Code + JetBrains ([Spec 005](./specs/005-vscode-jetbrains-ide-roadmap.md))**:
+- **Phase 1 IDE Ergonomics — AST Selection, Code Symbols, Sticky Scroll & Unified Quick Open ([Spec 005](./specs/005-ast-navigation-and-sticky-scroll.md))**:
   - **AST Extend / Shrink Selection (`Shift+Alt+Right` / `Shift+Alt+Left`, `src/syntax/ast.rs`)**: mở rộng và thu gọn vùng chọn theo từng cấp cây cú pháp Tree-sitter (an toàn UTF-8).
   - **Code Outline / Go to Symbol (`Ctrl+R`, `src/syntax/symbols.rs`)**: trích xuất symbol từ Tree-sitter cho Rust, Python, JS/TS, PHP, C/C++, TOML, JSON, Markdown và nhảy thẳng tới dòng định nghĩa qua fuzzy search.
   - **Sticky Scroll trong `CodeView`**: tự động ghim tối đa 3 dòng ngữ cảnh bao quanh (`impl`, `fn`, `class`, `struct`…) ở mép trên khi cuộn sâu; bấm vào dòng ghim để nhảy về đầu khối.

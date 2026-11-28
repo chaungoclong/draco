@@ -2,6 +2,9 @@
 /target
 **/*.rs.bk
 
+# Local agent skills (keep repo lightweight)
+/.agents
+
 # Temporary recordings & scratch files
 /tmp
 *.mp4

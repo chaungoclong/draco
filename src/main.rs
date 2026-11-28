@@ -8,11 +8,18 @@ use eframe::egui;
 fn main() -> eframe::Result<()> {
     let initial_paths: Vec<PathBuf> = std::env::args_os().skip(1).map(PathBuf::from).collect();
 
+    let mut viewport = egui::ViewportBuilder::default()
+        .with_title("Draco")
+        .with_inner_size([1280.0, 820.0])
+        .with_min_inner_size([640.0, 400.0]);
+
+    if let Ok(icon) = eframe::icon_data::from_png_bytes(include_bytes!("../assets/icons/draco.png"))
+    {
+        viewport = viewport.with_icon(icon);
+    }
+
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default()
-            .with_title("Draco")
-            .with_inner_size([1280.0, 820.0])
-            .with_min_inner_size([640.0, 400.0]),
+        viewport,
         ..Default::default()
     };
 

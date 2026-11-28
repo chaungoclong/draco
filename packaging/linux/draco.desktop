@@ -3,6 +3,7 @@ Name=Draco
 GenericName=Code Editor
 Comment=Lightweight, fast, GPU-accelerated Rust code editor
 Exec=draco %F
+Icon=draco
 Terminal=false
 Type=Application
 Categories=Development;TextEditor;IDE;

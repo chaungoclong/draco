@@ -93,7 +93,11 @@ main() {
 
   if [ "$OS_PART" = "linux" ] && [ -f "${EXTRACTED_DIR}/draco.desktop" ]; then
     APP_DIR="$HOME/.local/share/applications"
-    mkdir -p "$APP_DIR"
+    ICON_DIR="$HOME/.local/share/icons/hicolor/256x256/apps"
+    mkdir -p "$APP_DIR" "$ICON_DIR"
+    if [ -f "${EXTRACTED_DIR}/draco.png" ]; then
+      cp "${EXTRACTED_DIR}/draco.png" "${ICON_DIR}/draco.png"
+    fi
     sed "s|^Exec=draco|Exec=${INSTALL_DIR}/draco|" "${EXTRACTED_DIR}/draco.desktop" > "${APP_DIR}/draco.desktop"
   fi
 

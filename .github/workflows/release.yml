@@ -96,6 +96,7 @@ jobs:
           cp docs/guides/user-guide.md "dist/${STAGE}/USER_GUIDE.md"
           if [ "${{ runner.os }}" = "Linux" ]; then
             cp packaging/linux/draco.desktop "dist/${STAGE}/draco.desktop"
+            cp assets/icons/draco.png "dist/${STAGE}/draco.png"
           fi
           tar -C dist -czf "dist/${STAGE}.tar.gz" "${STAGE}"
           rm -rf "dist/${STAGE}"
@@ -106,10 +107,11 @@ jobs:
         run: |
           VER="${{ steps.meta.outputs.version }}"
           PKG_DIR="dist/deb_pkg"
-          mkdir -p "${PKG_DIR}/DEBIAN" "${PKG_DIR}/usr/bin" "${PKG_DIR}/usr/share/applications"
+          mkdir -p "${PKG_DIR}/DEBIAN" "${PKG_DIR}/usr/bin" "${PKG_DIR}/usr/share/applications" "${PKG_DIR}/usr/share/icons/hicolor/256x256/apps"
           cp "target/${{ matrix.target }}/release/draco" "${PKG_DIR}/usr/bin/draco"
           chmod 0755 "${PKG_DIR}/usr/bin/draco"
           cp packaging/linux/draco.desktop "${PKG_DIR}/usr/share/applications/draco.desktop"
+          cp assets/icons/draco.png "${PKG_DIR}/usr/share/icons/hicolor/256x256/apps/draco.png"
           cat > "${PKG_DIR}/DEBIAN/control" <<EOF
           Package: draco
           Version: ${VER}
@@ -125,17 +127,38 @@ jobs:
           dpkg-deb --build "${PKG_DIR}" "dist/draco_${VER}_amd64.deb"
           rm -rf "${PKG_DIR}"
 
-      - name: Package Windows standalone .exe & .zip
+      - name: Embed icon into Windows .exe & build Inno Setup installer
         if: matrix.archive == 'zip'
         shell: pwsh
         run: |
-          $stage = "draco-${{ steps.meta.outputs.tag }}-${{ matrix.asset_target }}"
+          $tag = "${{ steps.meta.outputs.tag }}"
+          $ver = "${{ steps.meta.outputs.version }}"
+          $exe = "target\${{ matrix.target }}\release\draco.exe"
+
+          # Embed Draco icon & version metadata directly into draco.exe
+          choco install rcedit -y --no-progress
+          rcedit $exe `
+            --set-icon "assets\icons\draco.ico" `
+            --set-version-string "ProductName" "Draco Code Editor" `
+            --set-version-string "FileDescription" "Lightweight GPU-accelerated Rust code editor" `
+            --set-file-version "$ver.0" `
+            --set-product-version "$ver.0"
+
+          # Package standalone portable .exe and .zip
+          $stage = "draco-$tag-${{ matrix.asset_target }}"
           New-Item -ItemType Directory -Force -Path "dist\$stage" | Out-Null
-          Copy-Item "target\${{ matrix.target }}\release\draco.exe" "dist\$stage.exe"
-          Copy-Item "target\${{ matrix.target }}\release\draco.exe" "dist\$stage\draco.exe"
+          Copy-Item $exe "dist\$stage.exe"
+          Copy-Item $exe "dist\$stage\draco.exe"
           Copy-Item "docs\guides\user-guide.md" "dist\$stage\USER_GUIDE.md"
           Compress-Archive -Path "dist\$stage\*" -DestinationPath "dist\$stage.zip" -Force
           Remove-Item -Recurse -Force "dist\$stage"
+
+          # Build native Windows installer (draco-<tag>-x86_64-setup.exe) via Inno Setup
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            choco install innosetup -y --no-progress
+          }
+          & $iscc /DMyAppVersion="$ver" /DMyAppTag="$tag" /DMyExePath="..\..\$exe" "packaging\windows\draco.iss"
 
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4
@@ -189,8 +212,10 @@ jobs:
             sudo apt install ./draco_*_amd64.deb
             ```
 
-            ### Windows (`.exe` or PowerShell)
-            Download `draco-*-x86_64-windows.exe` to run directly, or install into `PATH` via PowerShell:
+            ### Windows (Installer `.exe`, Portable `.exe`, or PowerShell)
+            - **Recommended (Full Installer)**: Download and run `draco-*-x86_64-setup.exe` (Start Menu, Desktop icon, PATH, "Open with Draco" context menu, Uninstaller — no Admin required).
+            - **Portable**: Download `draco-*-x86_64-windows.exe` to run directly.
+            - **PowerShell 1-line**:
             ```powershell
             irm https://raw.githubusercontent.com/chaungoclong/draco/main/scripts/install.ps1 | iex
             ```

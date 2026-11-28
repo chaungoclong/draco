@@ -29,7 +29,7 @@
   curl -fsSL https://raw.githubusercontent.com/chaungoclong/draco/main/scripts/install.sh | sh
   ```
 - **Ubuntu / Debian (`.deb`)**: tải `draco_*_amd64.deb` tại [GitHub Releases](https://github.com/chaungoclong/draco/releases) rồi chạy `sudo apt install ./draco_*_amd64.deb`.
-- **Windows (PowerShell)**:
+- **Windows**: tải bộ cài `draco-*-x86_64-setup.exe` (hoặc bản portable `draco-*-x86_64-windows.exe`) từ [GitHub Releases](https://github.com/chaungoclong/draco/releases), hoặc cài 1 dòng qua PowerShell:
   ```powershell
   irm https://raw.githubusercontent.com/chaungoclong/draco/main/scripts/install.ps1 | iex
   ```

@@ -230,13 +230,39 @@ impl DracoApp {
     }
 
     fn open_workspace_folder(&mut self, root: PathBuf) {
+        let root = fs::canonicalize(&root).unwrap_or(root);
+        let switching_workspace = self
+            .file_tree
+            .as_ref()
+            .is_some_and(|tree| tree.root != root);
+
+        if switching_workspace {
+            self.tabs.clear();
+            self.new_empty_tab();
+            self.split_tab = None;
+            self.split_right_focused = false;
+            self.recent_files.clear();
+            self.workspace_searcher.clear();
+            self.workspace_search_ui.query.clear();
+            self.find_bar.open = false;
+            self.find_bar.matches.clear();
+            self.diagnostics.clear();
+            self.inlay_hints.clear();
+            self.code_actions.close();
+            self.completion.close();
+            self.signature_help = None;
+            self.git_diff.clear();
+            self.explorer_ui = ExplorerUiState::default();
+            self.md_cache = MarkdownPreviewCache::default();
+        }
+
         self.lsp.set_root(root.clone());
         self.indexer
             .start_index(root.clone(), Arc::clone(&self.repaint));
         self.plugins.reload(Some(&root), &self.settings);
         self.watcher = WorkspaceWatcher::watch(&root, Arc::clone(&self.repaint)).ok();
-        self.file_tree = Some(FileTree::open(root));
-        self.status_message = Some("Workspace opened".to_string());
+        self.file_tree = Some(FileTree::open(root.clone()));
+        self.status_message = Some(format!("Workspace opened: {}", root.display()));
     }
 
     fn handle_watch_events(&mut self) {

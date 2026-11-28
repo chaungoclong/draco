@@ -91,6 +91,12 @@ pub struct GitDiffTracker {
 }
 
 impl GitDiffTracker {
+    pub fn clear(&self) {
+        if let Ok(mut guard) = self.cache.lock() {
+            guard.clear();
+        }
+    }
+
     pub fn request_refresh(&self, path: PathBuf, repaint: Arc<dyn Fn() + Send + Sync>) {
         let cache = Arc::clone(&self.cache);
         thread::spawn(move || {

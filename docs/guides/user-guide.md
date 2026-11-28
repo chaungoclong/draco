@@ -37,7 +37,7 @@ draco src/main.rs docs/README.md
 ```
 
 Hoặc sau khi đã mở cửa sổ Draco:
-- **Mở thư mục (Workspace)**: nhấn `Ctrl+Shift+O` (hoặc bấm nút mở thư mục trong File Explorer).
+- **Mở thư mục (Workspace)**: nhấn `Ctrl+Shift+O` (hoặc bấm nút mở thư mục trong File Explorer). Khi chuyển sang thư mục mới, Draco tự động đóng các tab và dọn sạch lịch sử/kết quả tìm kiếm của thư mục cũ.
 - **Mở 1 file lẻ**: nhấn `Ctrl+O`.
 - **Tạo file mới**: nhấn `Ctrl+N`.
 - **Lưu file**: nhấn `Ctrl+S` (`Ctrl+Shift+S` để Lưu dưới tên khác). Mặc định **Auto-Save đang BẬT**, Draco tự lưu file sau khi bạn ngừng gõ.

@@ -1,4 +1,5 @@
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
@@ -21,19 +22,33 @@ pub fn fuzzy_score(pattern: &str, candidate: &str) -> Option<i32> {
 #[derive(Clone)]
 pub struct WorkspaceIndexer {
     files: Arc<Mutex<Vec<PathBuf>>>,
+    generation: Arc<AtomicU64>,
 }
 
 impl Default for WorkspaceIndexer {
     fn default() -> Self {
         Self {
             files: Arc::new(Mutex::new(Vec::new())),
+            generation: Arc::new(AtomicU64::new(0)),
         }
     }
 }
 
 impl WorkspaceIndexer {
+    pub fn clear(&self) {
+        self.generation.fetch_add(1, Ordering::SeqCst);
+        if let Ok(mut guard) = self.files.lock() {
+            guard.clear();
+        }
+    }
+
     pub fn start_index(&self, root: PathBuf, repaint: Arc<dyn Fn() + Send + Sync>) {
+        let my_gen = self.generation.fetch_add(1, Ordering::SeqCst) + 1;
+        if let Ok(mut guard) = self.files.lock() {
+            guard.clear();
+        }
         let files_arc = Arc::clone(&self.files);
+        let gen_arc = Arc::clone(&self.generation);
         thread::spawn(move || {
             let mut collected = Vec::new();
             let walker = WalkBuilder::new(&root)
@@ -42,12 +57,18 @@ impl WorkspaceIndexer {
                 .build();
 
             for entry in walker.flatten() {
+                if gen_arc.load(Ordering::SeqCst) != my_gen {
+                    return;
+                }
                 if entry.file_type().map(|t| t.is_file()).unwrap_or(false) {
                     collected.push(entry.into_path());
                     if collected.len() >= 100_000 {
                         break;
                     }
                 }
+            }
+            if gen_arc.load(Ordering::SeqCst) != my_gen {
+                return;
             }
             if let Ok(mut guard) = files_arc.lock() {
                 *guard = collected;

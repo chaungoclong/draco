@@ -63,3 +63,44 @@ fn workspace_tree_respects_gitignore_and_ranks_quick_open() {
     let php_results = indexer.query(tmp.path(), "index.php", 10);
     assert_eq!(php_results[0].1, "public/index.php");
 }
+
+#[test]
+fn switching_workspace_folder_clears_previous_indexed_files() {
+    let dir_a = TempDir::new("feat_ws_switch_a");
+    dir_a.write_file("old_alpha.rs", "fn old() {}");
+    let dir_b = TempDir::new("feat_ws_switch_b");
+    dir_b.write_file("new_beta.rs", "fn new_fn() {}");
+
+    let indexer = WorkspaceIndexer::default();
+
+    // Index Folder A
+    let done_a = Arc::new(AtomicBool::new(false));
+    let done_a_cb = Arc::clone(&done_a);
+    indexer.start_index(
+        dir_a.path().to_path_buf(),
+        Arc::new(move || done_a_cb.store(true, Ordering::SeqCst)),
+    );
+    let deadline = Instant::now() + Duration::from_secs(3);
+    while !done_a.load(Ordering::SeqCst) && Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert_eq!(indexer.query(dir_a.path(), "old_alpha", 10).len(), 1);
+
+    // Switch to Folder B -> must NOT retain any files from Folder A
+    let done_b = Arc::new(AtomicBool::new(false));
+    let done_b_cb = Arc::clone(&done_b);
+    indexer.start_index(
+        dir_b.path().to_path_buf(),
+        Arc::new(move || done_b_cb.store(true, Ordering::SeqCst)),
+    );
+    let deadline_b = Instant::now() + Duration::from_secs(3);
+    while !done_b.load(Ordering::SeqCst) && Instant::now() < deadline_b {
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert!(done_b.load(Ordering::SeqCst));
+
+    let res_b = indexer.query(dir_b.path(), "", 20);
+    assert_eq!(res_b.len(), 1);
+    assert_eq!(res_b[0].1, "new_beta.rs");
+    assert!(indexer.query(dir_b.path(), "old_alpha", 10).is_empty());
+}

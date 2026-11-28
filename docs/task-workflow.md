@@ -36,9 +36,10 @@ analyzing → planning → in_progress → ready_for_test → ready_for_review �
 ### 3. `ready_for_test` (Quality Gates & Docs Sync)
 Chạy các cổng kiểm tra:
 ```bash
-cargo check --all-targets          # Gate 1: 0 errors, 0 warnings
-cargo test -- --test-threads=4     # Gate 2: lib + unit + feature + headless E2E
-cargo build --release              # Gate 3: khi cần kiểm tra bản release/UI
+cargo check --all-targets                  # Gate 1: 0 errors, 0 warnings
+cargo clippy --all-targets -- -D warnings  # Gate 2: Rust linter (0 warnings)
+cargo test -- --test-threads=4             # Gate 3: lib + unit + feature + headless E2E
+cargo build --release                      # Gate 4: khi cần kiểm tra bản release/UI
 ```
 
 **Cập nhật mọi tài liệu liên quan trong cùng nhánh:**

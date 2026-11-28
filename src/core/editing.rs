@@ -562,9 +562,9 @@ pub fn toggle_comment(doc: &mut Document) {
         let trimmed = &s[s.char_indices().nth(ws_len).map(|(b, _)| b).unwrap_or(s.len())..];
 
         if all_commented {
-            if trimmed.starts_with(prefix) {
+            if let Some(rest) = trimmed.strip_prefix(prefix) {
                 let mut remove_len = prefix.chars().count();
-                if trimmed[prefix.len()..].starts_with(' ') {
+                if rest.starts_with(' ') {
                     remove_len += 1;
                 }
                 edits.push((content_start..content_start + remove_len, String::new()));

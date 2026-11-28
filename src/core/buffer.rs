@@ -313,7 +313,7 @@ impl Document {
 
         let before_selections = self.selections.clone();
         // Sort descending by start char so applying edits doesn't shift earlier offsets.
-        edits.sort_by(|a, b| b.0.start.cmp(&a.0.start));
+        edits.sort_by_key(|a| std::cmp::Reverse(a.0.start));
 
         let mut changes = Vec::with_capacity(edits.len());
         for (range, new_text) in edits {

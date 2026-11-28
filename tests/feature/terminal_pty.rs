@@ -24,12 +24,11 @@ fn pty_shell_executes_command_and_resizes() {
     let deadline = Instant::now() + Duration::from_secs(4);
     let mut found = false;
     while Instant::now() < deadline {
-        if let Ok(grid) = pty.grid.lock() {
-            if (0..grid.rows).any(|r| grid.row_text(r).contains("DRACO_PTY_VERIFIED")) {
+        if let Ok(grid) = pty.grid.lock()
+            && (0..grid.rows).any(|r| grid.row_text(r).contains("DRACO_PTY_VERIFIED")) {
                 found = true;
                 break;
             }
-        }
         std::thread::sleep(Duration::from_millis(30));
     }
     assert!(found, "PTY output did not contain DRACO_PTY_VERIFIED");

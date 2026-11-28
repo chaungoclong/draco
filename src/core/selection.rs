@@ -88,6 +88,10 @@ impl SelectionSet {
         self.selections.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.selections.is_empty()
+    }
+
     pub fn primary(&self) -> Selection {
         self.selections[self.primary.min(self.selections.len() - 1)]
     }

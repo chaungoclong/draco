@@ -276,11 +276,10 @@ fn find_yaml_colon(s: &str) -> Option<usize> {
             in_single = !in_single;
         } else if b == b'"' && !in_single {
             in_double = !in_double;
-        } else if b == b':' && !in_single && !in_double {
-            if i + 1 == bytes.len() || bytes[i + 1].is_ascii_whitespace() {
+        } else if b == b':' && !in_single && !in_double
+            && (i + 1 == bytes.len() || bytes[i + 1].is_ascii_whitespace()) {
                 return Some(i);
             }
-        }
     }
     None
 }

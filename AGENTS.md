@@ -50,6 +50,8 @@ Whenever the application changes (feature, bugfix, UI/UX tweak, shortcut, config
 
 ## Commands
 - Check: `cargo check --all-targets`
+- Lint: `cargo clippy --all-targets -- -D warnings`
+- Format: `cargo fmt --check`
 - Test: `cargo test`
 - Build release: `cargo build --release`
 - Run: `cargo run --release -- [optional_path]`

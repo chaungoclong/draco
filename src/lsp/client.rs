@@ -501,10 +501,10 @@ fn handle_incoming(
 ) {
     // Notification from server
     if let Some(method) = val.get("method").and_then(|m| m.as_str()) {
-        if method == "textDocument/publishDiagnostics" {
-            if let Some(params) = val.get("params") {
-                if let Some(uri_str) = params.get("uri").and_then(|u| u.as_str()) {
-                    if let Ok(path) = Url::parse(uri_str).and_then(|u| u.to_file_path().map_err(|_| url::ParseError::EmptyHost)) {
+        if method == "textDocument/publishDiagnostics"
+            && let Some(params) = val.get("params")
+                && let Some(uri_str) = params.get("uri").and_then(|u| u.as_str())
+                    && let Ok(path) = Url::parse(uri_str).and_then(|u| u.to_file_path().map_err(|_| url::ParseError::EmptyHost)) {
                         let mut items = Vec::new();
                         if let Some(arr) = params.get("diagnostics").and_then(|d| d.as_array()) {
                             for d in arr {
@@ -522,9 +522,6 @@ fn handle_incoming(
                         }
                         let _ = tx_ev.send(LspEvent::Diagnostics { path, items });
                     }
-                }
-            }
-        }
         return;
     }
 
@@ -593,13 +590,12 @@ fn handle_incoming(
                 } else {
                     &loc["targetSelectionRange"]["start"]
                 };
-                if let Some(u) = uri_str {
-                    if let Ok(path) = Url::parse(u).and_then(|url| url.to_file_path().map_err(|_| url::ParseError::EmptyHost)) {
+                if let Some(u) = uri_str
+                    && let Ok(path) = Url::parse(u).and_then(|url| url.to_file_path().map_err(|_| url::ParseError::EmptyHost)) {
                         let line = range["line"].as_u64().unwrap_or(0) as usize;
                         let col = range["character"].as_u64().unwrap_or(0) as usize;
                         let _ = tx_ev.send(LspEvent::Definition { path, line, col });
                     }
-                }
             }
         }
         PendingKind::Hover => {
@@ -690,30 +686,25 @@ pub fn parse_workspace_edit(val: &Value) -> HashMap<PathBuf, Vec<TextEditItem>> 
         for (uri_str, edits_val) in changes {
             if let Ok(path) = Url::parse(uri_str)
                 .and_then(|u| u.to_file_path().map_err(|_| url::ParseError::EmptyHost))
-            {
-                if let Some(arr) = edits_val.as_array() {
+                && let Some(arr) = edits_val.as_array() {
                     let parsed = parse_text_edits(arr);
                     if !parsed.is_empty() {
                         out.entry(path).or_default().extend(parsed);
                     }
                 }
-            }
         }
     }
     if let Some(doc_changes) = val.get("documentChanges").and_then(|c| c.as_array()) {
         for dc in doc_changes {
-            if let Some(uri_str) = dc["textDocument"]["uri"].as_str() {
-                if let Ok(path) = Url::parse(uri_str)
+            if let Some(uri_str) = dc["textDocument"]["uri"].as_str()
+                && let Ok(path) = Url::parse(uri_str)
                     .and_then(|u| u.to_file_path().map_err(|_| url::ParseError::EmptyHost))
-                {
-                    if let Some(arr) = dc["edits"].as_array() {
+                    && let Some(arr) = dc["edits"].as_array() {
                         let parsed = parse_text_edits(arr);
                         if !parsed.is_empty() {
                             out.entry(path).or_default().extend(parsed);
                         }
                     }
-                }
-            }
         }
     }
     out

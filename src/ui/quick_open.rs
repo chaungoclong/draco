@@ -126,7 +126,7 @@ pub fn show_quick_open_unified(
             })
             .collect();
         if !state.query.is_empty() {
-            items.sort_by(|a, b| b.2.cmp(&a.2));
+            items.sort_by_key(|a| std::cmp::Reverse(a.2));
         }
         items.into_iter().take(25).map(|(p, r, _)| (p, r)).collect()
     } else {
@@ -145,7 +145,7 @@ pub fn show_quick_open_unified(
             })
             .collect();
         if !state.query.is_empty() {
-            items.sort_by(|a, b| b.1.cmp(&a.1));
+            items.sort_by_key(|a| std::cmp::Reverse(a.1));
         }
         items.into_iter().take(40).map(|(s, _)| s).collect()
     } else {

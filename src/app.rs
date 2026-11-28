@@ -185,11 +185,10 @@ impl DracoApp {
             if abs.is_dir() {
                 app.open_workspace_folder(abs);
             } else if abs.is_file() {
-                if app.file_tree.is_none() {
-                    if let Some(parent) = abs.parent() {
+                if app.file_tree.is_none()
+                    && let Some(parent) = abs.parent() {
                         app.open_workspace_folder(parent.to_path_buf());
                     }
-                }
                 app.open_file_path(abs);
             }
         }
@@ -294,8 +293,8 @@ impl DracoApp {
                 WatchEvent::FileModified(path) => {
                     let canon = fs::canonicalize(&path).unwrap_or(path);
                     for tab in &mut self.tabs {
-                        if !tab.doc.dirty && tab.doc.path.as_deref() == Some(canon.as_path()) {
-                            if let Ok(true) = tab.doc.reload_from_disk() {
+                        if !tab.doc.dirty && tab.doc.path.as_deref() == Some(canon.as_path())
+                            && let Ok(true) = tab.doc.reload_from_disk() {
                                 let text = tab.doc.rope.to_string();
                                 self.lsp
                                     .did_change(tab.doc.language, &canon, tab.doc.version, &text);
@@ -304,7 +303,6 @@ impl DracoApp {
                                     tab.doc.title()
                                 ));
                             }
-                        }
                     }
                 }
                 WatchEvent::TreeChanged => {
@@ -420,8 +418,8 @@ impl DracoApp {
         let mut soonest_remaining: Option<Duration> = None;
 
         for tab in &mut self.tabs {
-            if tab.doc.dirty && tab.doc.path.is_some() {
-                if let Some(ts) = tab.last_edit {
+            if tab.doc.dirty && tab.doc.path.is_some()
+                && let Some(ts) = tab.last_edit {
                     let elapsed = ts.elapsed();
                     if elapsed >= delay {
                         if tab.doc.save().is_ok() {
@@ -438,7 +436,6 @@ impl DracoApp {
                         });
                     }
                 }
-            }
         }
 
         if let Some(rem) = soonest_remaining {
@@ -459,11 +456,10 @@ impl DracoApp {
             if self.active_tab >= self.tabs.len() {
                 self.active_tab = self.tabs.len() - 1;
             }
-            if let Some(st) = self.split_tab {
-                if st >= self.tabs.len() {
+            if let Some(st) = self.split_tab
+                && st >= self.tabs.len() {
                     self.split_tab = Some(self.tabs.len() - 1);
                 }
-            }
         }
         self.recompute_search();
     }
@@ -759,7 +755,7 @@ impl DracoApp {
                         (s.min(en)..s.max(en), e.new_text.clone())
                     })
                     .collect();
-                char_edits.sort_by(|a, b| b.0.start.cmp(&a.0.start));
+                char_edits.sort_by_key(|a| std::cmp::Reverse(a.0.start));
                 let cur = tab.doc.selections.clone();
                 total_applied += char_edits.len();
                 tab.doc.apply_edits(char_edits, cur, EditKind::Other);
@@ -773,7 +769,7 @@ impl DracoApp {
                         (s.min(en)..s.max(en), e.new_text.clone())
                     })
                     .collect();
-                char_edits.sort_by(|a, b| b.0.start.cmp(&a.0.start));
+                char_edits.sort_by_key(|a| std::cmp::Reverse(a.0.start));
                 let cur = doc.selections.clone();
                 total_applied += char_edits.len();
                 doc.apply_edits(char_edits, cur, EditKind::Other);
@@ -949,34 +945,31 @@ impl DracoApp {
                 self.status_message = Some(format!("Markdown view: {:?}", self.md_mode));
             }
             AppAction::GoToDefinition => {
-                if let Some(tab) = self.tabs.get(self.active_tab) {
-                    if let Some(path) = &tab.doc.path {
+                if let Some(tab) = self.tabs.get(self.active_tab)
+                    && let Some(path) = &tab.doc.path {
                         let (line, col) =
                             tab.doc.char_to_line_col(tab.doc.selections.primary().head);
                         self.lsp
                             .request_definition(tab.doc.language, path, line, col);
                     }
-                }
             }
             AppAction::TriggerCompletion => {
-                if let Some(tab) = self.tabs.get(self.active_tab) {
-                    if let Some(path) = &tab.doc.path {
+                if let Some(tab) = self.tabs.get(self.active_tab)
+                    && let Some(path) = &tab.doc.path {
                         let (line, col) =
                             tab.doc.char_to_line_col(tab.doc.selections.primary().head);
                         self.lsp
                             .request_completion(tab.doc.language, path, line, col);
                     }
-                }
             }
             AppAction::TriggerCodeAction => {
-                if let Some(tab) = self.tabs.get(self.active_tab) {
-                    if let Some(path) = &tab.doc.path {
+                if let Some(tab) = self.tabs.get(self.active_tab)
+                    && let Some(path) = &tab.doc.path {
                         let (line, col) =
                             tab.doc.char_to_line_col(tab.doc.selections.primary().head);
                         self.lsp
                             .request_code_actions(tab.doc.language, path, line, col);
                     }
-                }
             }
             AppAction::RenameSymbol => {
                 if let Some(tab) = self.tabs.get(self.active_tab) {
@@ -1796,8 +1789,8 @@ impl eframe::App for DracoApp {
                             }
                         }
                         FindAction::ReplaceAll => {
-                            if let Some(tab) = self.tabs.get_mut(self.active_tab) {
-                                if let Ok(count) = search::replace_all(
+                            if let Some(tab) = self.tabs.get_mut(self.active_tab)
+                                && let Ok(count) = search::replace_all(
                                     &mut tab.doc,
                                     &self.find_bar.query,
                                     &self.find_bar.replacement,
@@ -1808,7 +1801,6 @@ impl eframe::App for DracoApp {
                                         Some(format!("Replaced {count} occurrences"));
                                     self.recompute_search();
                                 }
-                            }
                         }
                         FindAction::Close => {
                             self.find_bar.matches.clear();
@@ -2148,12 +2140,11 @@ impl eframe::App for DracoApp {
                             }
                         }
 
-                        if let Some((line, col)) = out.request_definition {
-                            if let Some(path) = &tab.doc.path {
+                        if let Some((line, col)) = out.request_definition
+                            && let Some(path) = &tab.doc.path {
                                 self.lsp
                                     .request_definition(tab.doc.language, path, line, col);
                             }
-                        }
                     }
                 }
                 if need_recompute_search {
@@ -2222,35 +2213,29 @@ impl eframe::App for DracoApp {
         // 8. Floating Completion Popup + LSP Code Actions, Rename & Signature Help
         if let Some(inserted) =
             completion::show_completion_popup(ctx, &mut self.completion, cursor_anchor, &self.theme)
-        {
-            if let Some(tab) = self.tabs.get_mut(self.active_tab) {
+            && let Some(tab) = self.tabs.get_mut(self.active_tab) {
                 editing::insert_text(&mut tab.doc, &inserted);
                 tab.last_edit = Some(Instant::now());
             }
-        }
         if let Some(action) = lsp_popups::show_code_action_popup(
             ctx,
             &mut self.code_actions,
             cursor_anchor,
             &self.theme,
-        ) {
-            if !action.edits.is_empty() {
+        )
+            && !action.edits.is_empty() {
                 self.apply_workspace_edits(action.edits);
             }
-        }
         if let Some(new_name) =
             lsp_popups::show_rename_modal(ctx, &mut self.rename_modal, &self.theme)
-        {
-            if let Some(tab) = self.tabs.get(self.active_tab) {
-                if let Some(path) = &tab.doc.path {
+            && let Some(tab) = self.tabs.get(self.active_tab)
+                && let Some(path) = &tab.doc.path {
                     let (line, col) =
                         tab.doc.char_to_line_col(tab.doc.selections.primary().head);
                     self.lsp
                         .request_rename(tab.doc.language, path, line, col, &new_name);
                     self.status_message = Some(format!("Renaming symbol to `{new_name}`…"));
                 }
-            }
-        }
         if ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
             self.signature_help = None;
         }

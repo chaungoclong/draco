@@ -30,12 +30,12 @@ jobs:
             asset_target: x86_64-linux
             archive: tar.gz
             build_deb: true
-          - os: macos-14
+          - os: macos-latest
             target: aarch64-apple-darwin
             asset_target: aarch64-macos
             archive: tar.gz
             build_deb: false
-          - os: macos-13
+          - os: macos-latest
             target: x86_64-apple-darwin
             asset_target: x86_64-macos
             archive: tar.gz

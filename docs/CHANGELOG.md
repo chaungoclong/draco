@@ -59,6 +59,7 @@ Tất cả thay đổi đáng chú ý của **Draco** đều được ghi nhận
 - Quy tắc bảo trì tài liệu trong `AGENTS.md` cho các thay đổi tương lai.
 
 ### Fixed
+- Sửa lỗi còn lưu file/tab và kết quả tìm kiếm của thư mục cũ khi mở thư mục workspace mới (`Ctrl+Shift+O`): tự động đóng các tab cũ, reset Split Editor, xóa `recent_files`, Quick Open index (kèm generation counter chống luồng nền cũ ghi đè), kết quả Workspace Search, Find Bar, LSP cache, Git diff cache và Markdown preview cache.
 - Sửa lỗi mất chữ bên trong sơ đồ Mermaid trên Linux bằng cách ánh xạ rõ `set_sans_serif_family` / `set_monospace_family` và `opts.font_family` cho `resvg`.
 - Sửa lỗi giật/kéo ngược khi cuộn 2 chiều & nhấn Outline bằng quy tắc Master/Follower theo con trỏ chuột và nhảy trực tiếp tới `heading_y_positions`.
 - Sửa lỗi link inline trong danh sách Markdown bị rớt dòng, sửa thứ tự nút `Sync | Outline | Editor | Split | Preview` và đo chiều rộng tab theo font metrics thật.
